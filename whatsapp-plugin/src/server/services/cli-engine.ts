@@ -442,6 +442,8 @@ export class CliEngine {
   /** 已 spawn 但还没就绪的进程：dispose 时也要能收掉，否则会漏。 */
   private readonly booting = new Set<WarmWorker>();
   private warmTimer: NodeJS.Timeout | null = null;
+  /** Prevent queued warm-up continuations from spawning/leaking workers after disposal. */
+  private disposed = false;
 
   constructor(options: CliEngineOptions = {}) {
     this.options = {
@@ -592,6 +594,7 @@ export class CliEngine {
 
   /** 关停：把池里的进程全部收掉（测试 / 进程退出时用）。 */
   dispose(): void {
+    this.disposed = true;
     if (this.warmTimer) clearInterval(this.warmTimer);
     this.warmTimer = null;
     for (const worker of this.booting) this.kill(worker);
@@ -608,13 +611,17 @@ export class CliEngine {
 
   /** 后台补一个干净进程。失败静默：真实请求自己会把错误报出来。 */
   private async ensureWarm(model: string, effort: string): Promise<void> {
-    if (!this.options.warm) return;
+    if (!this.options.warm || this.disposed) return;
     const target = Math.max(1, this.options.warmTarget ?? WARM_TARGET_DEFAULT);
     if (this.warmCount() + this.warming >= target) return;
     this.warming += 1;
     let worker: WarmWorker | null = null;
     try {
       worker = await this.spawnWarm(model, effort);
+      if (this.disposed) {
+        this.kill(worker);
+        return;
+      }
       this.booting.add(worker);
       /**
        * 等它真正加载完再入池。进程刚 spawn 时写进去的请求，仍然要陪它把
@@ -623,7 +630,10 @@ export class CliEngine {
        */
       const readyMs = Math.max(0, this.options.warmReadyMs ?? WARM_READY_MS);
       if (readyMs) await new Promise((resolve) => setTimeout(resolve, readyMs));
-      if (worker.closed) return;
+      if (this.disposed || worker.closed) {
+        if (this.disposed) this.kill(worker);
+        return;
+      }
       const list = this.warm.get(worker.key) ?? [];
       list.push(worker);
       this.warm.set(worker.key, list);
