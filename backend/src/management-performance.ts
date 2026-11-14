@@ -1,4 +1,5 @@
 import { canSeeOwner } from "./auth.js";
+import { entityDuplicateKey } from "./entity-duplicates.js";
 import type { SessionUser } from "./types.js";
 import type { getStore } from "./store.js";
 
@@ -34,6 +35,14 @@ export function buildManagementPerformance(store: Store, viewer: SessionUser, mo
     const id = member.id;
     const leads = store.leads.filter((lead) => lead.ownerId === id && lead.teamId === member.teamId
       && !lead.deletedAt && lead.status !== "invalid" && businessDate(lead.createdAt).startsWith(monthPrefix));
+    // A company's multiple imports/lead IDs count as only one new prospect.
+    const leadGroups = new Map<string, typeof leads>();
+    for (const lead of leads) {
+      const key = entityDuplicateKey(lead.company, lead.country);
+      const group = leadGroups.get(key) || [];
+      group.push(lead);
+      leadGroups.set(key, group);
+    }
     const leadIds = new Set(leads.map((lead) => lead.id));
     const linkedCustomerIds = new Set(leads.map((lead) => lead.convertedCustomerId).filter(Boolean));
     const ownerCustomers = new Set(store.customers.filter((customer) => customer.ownerId === id
@@ -47,14 +56,14 @@ export function buildManagementPerformance(store: Store, viewer: SessionUser, mo
       && activity.operatorId === id && activity.type !== "note"
       && activity.content.trim().length >= 10 && businessDate(activity.createdAt).startsWith(monthPrefix))
       .map((activity) => activity.customerId));
-    const candidateContacts = leads.filter((lead) => activities.has(lead.id)
-      || Boolean(lead.convertedCustomerId && customerContacts.has(lead.convertedCustomerId))).length;
+    const candidateContacts = [...leadGroups.values()].filter((group) => group.some((lead) => activities.has(lead.id)
+      || Boolean(lead.convertedCustomerId && customerContacts.has(lead.convertedCustomerId)))).length;
     const inboundCustomers = new Set(store.whatsappMessages.filter((message) =>
       linkedCustomerIds.has(message.customerId) && ownerCustomers.has(message.customerId)
       && message.direction === "inbound" && businessDate(message.createdAt).startsWith(monthPrefix))
       .map((message) => message.customerId));
-    const verifiedReplies = leads.filter((lead) => Boolean(lead.convertedCustomerId)
-      && inboundCustomers.has(lead.convertedCustomerId)).length;
+    const verifiedReplies = [...leadGroups.values()].filter((group) => group.some((lead) => Boolean(lead.convertedCustomerId)
+      && inboundCustomers.has(lead.convertedCustomerId))).length;
     const todos = store.todos.filter((task) => task.ownerId === id && task.teamId === member.teamId && !task.cancelledAt);
     const plans = store.planTasks.filter((task) => task.ownerId === id && task.teamId === member.teamId && task.status !== "cancelled");
     const todayTodos = todos.filter((task) => dueDate(task.dueAt) === today);
@@ -71,7 +80,7 @@ export function buildManagementPerformance(store: Store, viewer: SessionUser, mo
       overdueTasks: todos.filter((task) => !task.done && dueDate(task.dueAt) && dueDate(task.dueAt) < today).length
         + plans.filter((task) => task.status !== "done" && dueDate(task.dueAt) && dueDate(task.dueAt) < today).length,
       submittedToday: store.dailyReports.some((report) => report.ownerId === id && report.teamId === member.teamId && report.reportDate === today),
-      newLeads: leads.length, communicationCandidates: candidateContacts,
+      newLeads: leadGroups.size, communicationCandidates: candidateContacts,
       verifiedWhatsAppReplies: verifiedReplies, target: GOAL,
       verifiedProgressPercent: Math.min(100, Math.round(verifiedReplies / GOAL * 100)),
       followUps: store.customerActivities.filter((activity) => activity.operatorId === id
