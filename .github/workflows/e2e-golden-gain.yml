@@ -28,4 +28,4 @@ jobs:
           else npx playwright install --with-deps chrome
           fi
       - name: Run complete Playwright Chromium web UI tests
-        run: npm run test:e2e --workspace frontend
+        run: npm run test:e2e --workspace frontend -- --max-failures=3
