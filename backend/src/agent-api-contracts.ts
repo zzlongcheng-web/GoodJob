@@ -238,6 +238,8 @@ define("POST /api/customers/intake/analyze", objectSchema(["fileIds"], {
   fileIds: array(string({ minLength: 4, maxLength: 80 }), { minItems: 1, maxItems: 3 })
 }), "识别用户已暂存的客户资料文件并把字段回填到新增客户表单；只能引用用户刚上传、尚未过期的暂存文件，识别结果必须由人工核对后再保存客户。");
 
+define("POST /api/leads/parse-batch", objectSchema(["text"], { text: string({ minLength: 5, maxLength: 100000 }), save: boolean(), indexes: {}, overrides: {} }), "把一次粘贴的最多50家客户信息自动拆分并逐家识别、查重（save=false 返回核对清单）；业务员确认后 save=true 只录入状态为 ready 的客户，重复和缺信息的会被跳过并说明原因。");
+define("POST /api/leads/parse-text", objectSchema(["text"], { text: string({ minLength: 5, maxLength: 20000 }), save: boolean(), overrides: {} }), "把粘贴的客户信息文字识别成线索草稿（save=false）；业务员确认后 save=true 才入库并查重，不会在未确认时写入。");
 define("POST /api/leads", objectSchema(["company"], leadFields), "创建线索。未知联系资料保持空值；响应 lead.id 或 duplicate 是完成证据。");
 define("POST /api/leads/{id}/assign", objectSchema(["toOwnerId"], {
   toOwnerId: string({ minLength: 1, maxLength: 64 }),

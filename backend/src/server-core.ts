@@ -1,5 +1,5 @@
 /**
- * GoodJob CRM API 共享内核：应用实例、全局中间件与权限闸、跨模块共享的辅助函数与运行时状态。
+ * Golden Gain CRM API 共享内核：应用实例、全局中间件与权限闸、跨模块共享的辅助函数与运行时状态。
  * 各业务路由在 routes/*.ts，由 server.ts 按原顺序注册。
  */
 import cors from "cors";
@@ -393,6 +393,7 @@ function iamBusinessPermission(req: Request) {
   }
   if (pathName.startsWith("/api/leads")) {
     if (pathName.includes("/export")) return "lead.export";
+    if (pathName.includes("/parse-")) return "lead.create";
     if (method === "GET") return "lead.read";
     if (method === "DELETE") return "lead.delete";
     if (method === "POST" && /^\/api\/leads\/?$/u.test(pathName)) return "lead.create";
@@ -2933,7 +2934,7 @@ async function recoverEngineCliJobs(reason: string) {
       await finalizeEngineCliJob(publicUser(owner), job, snapshot);
       recovered += 1;
     }
-    if (recovered) console.log(`GoodJob CRM recovered ${recovered} unfinished AI engine job(s) (${reason})`);
+    if (recovered) console.log(`Golden Gain CRM recovered ${recovered} unfinished AI engine job(s) (${reason})`);
   } catch (error) {
     console.error("AI engine job recovery failed", error);
   } finally {
@@ -2943,7 +2944,7 @@ async function recoverEngineCliJobs(reason: string) {
 
 function startAiEngineRecoveryScheduler() {
   if (process.env.AI_ENGINE_RECOVERY === "false") {
-    console.log("GoodJob CRM AI engine job recovery disabled (AI_ENGINE_RECOVERY=false)");
+    console.log("Golden Gain CRM AI engine job recovery disabled (AI_ENGINE_RECOVERY=false)");
     return;
   }
   const pollMs = Math.max(60_000, Number(process.env.AI_ENGINE_RECOVERY_POLL_MS || 300_000) || 300_000);
@@ -3703,9 +3704,9 @@ async function enrichOutreachDraftLetters(reason: string) {
         processed += 1;
       }
       await store.persist();
-      console.log(`GoodJob CRM enriched outreach letters for ${host.label} (${reason})`);
+      console.log(`Golden Gain CRM enriched outreach letters for ${host.label} (${reason})`);
     }
-    if (processed) console.log(`GoodJob CRM enriched ${processed} outreach letter target(s) (${reason})`);
+    if (processed) console.log(`Golden Gain CRM enriched ${processed} outreach letter target(s) (${reason})`);
   } catch (error) {
     console.error("outreach letter enrichment failed", error);
   } finally {
@@ -3717,7 +3718,7 @@ let outreachLetterEnrichTimer: NodeJS.Timeout | null = null;
 
 function startOutreachLetterEnrichmentScheduler() {
   if (!outreachLetterEnrichmentEnabled()) {
-    console.log("GoodJob CRM outreach letter enrichment disabled (OUTREACH_LETTER_ENRICH=false)");
+    console.log("Golden Gain CRM outreach letter enrichment disabled (OUTREACH_LETTER_ENRICH=false)");
     return;
   }
   const pollMs = Math.max(10_000, Number(process.env.OUTREACH_LETTER_ENRICH_POLL_MS || 30_000) || 30_000);
@@ -6350,7 +6351,7 @@ function scheduleMidnightTodoArchive() {
     const archived = archiveExpiredTodos(store.todos, new Date());
     if (archived.length) {
       await store.persist();
-      console.log(`GoodJob CRM archived ${archived.length} todos into history`);
+      console.log(`Golden Gain CRM archived ${archived.length} todos into history`);
     }
     schedule();
   };
@@ -6567,10 +6568,10 @@ async function tickReminderRules(reason: string) {
       try {
         const result = await runReminderRuleNow(rule, rule.targetOwnerId || rule.ownerId, { persistWhenNoChanges: false });
         if (result.createdCount) {
-          console.log(`GoodJob CRM reminder rule「${rule.title}」created ${result.createdCount} todo(s) [${reason}] matched=${result.matchedCount} skipped=${result.skippedCount} failed=${result.failedCount}`);
+          console.log(`Golden Gain CRM reminder rule「${rule.title}」created ${result.createdCount} todo(s) [${reason}] matched=${result.matchedCount} skipped=${result.skippedCount} failed=${result.failedCount}`);
         }
       } catch (error) {
-        console.error(`GoodJob CRM reminder rule「${rule.title}」failed: ${error instanceof Error ? error.message : String(error)}`);
+        console.error(`Golden Gain CRM reminder rule「${rule.title}」failed: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
   } finally {
@@ -6584,12 +6585,12 @@ async function tickReminderRules(reason: string) {
  */
 function startReminderRuleScheduler() {
   if (process.env.REMINDER_RULE_SCHEDULER === "false") {
-    console.log("GoodJob CRM reminder rule scheduler disabled (REMINDER_RULE_SCHEDULER=false)");
+    console.log("Golden Gain CRM reminder rule scheduler disabled (REMINDER_RULE_SCHEDULER=false)");
     return;
   }
   const pollMs = Math.max(REMINDER_RULE_MIN_POLL_MS, Number(process.env.REMINDER_RULE_POLL_MS || 30_000) || 30_000);
   reminderRuleSchedulerTimer = setInterval(() => void tickReminderRules("scheduled"), pollMs);
-  console.log(`GoodJob CRM reminder rule scheduler enabled (poll ${pollMs}ms, ${enabledReminderRules().length} enabled rule(s))`);
+  console.log(`Golden Gain CRM reminder rule scheduler enabled (poll ${pollMs}ms, ${enabledReminderRules().length} enabled rule(s))`);
   void tickReminderRules("startup");
 }
 
@@ -6613,18 +6614,18 @@ async function tickPruneResourceEvents(reason: string) {
   try {
     const removed = await getResourceHubRepository().pruneEvents(RESOURCE_RETENTION_DAYS);
     if (removed > 0) {
-      console.log(`GoodJob CRM resource retrieval events pruned ${removed} row(s) [${reason}] (retention ${RESOURCE_RETENTION_DAYS}d)`);
+      console.log(`Golden Gain CRM resource retrieval events pruned ${removed} row(s) [${reason}] (retention ${RESOURCE_RETENTION_DAYS}d)`);
     }
   } catch (error) {
     // 清理失败只记日志：它是保洁工序，不能反过来把主流程带下水
-    console.error(`GoodJob CRM resource event prune failed: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(`Golden Gain CRM resource event prune failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
 /** 关闭方式：RESOURCE_EVENT_PRUNE=false；间隔：RESOURCE_EVENT_PRUNE_MS（默认 24h，下限 1h）。 */
 function startResourceEventPruneScheduler() {
   if (process.env.RESOURCE_EVENT_PRUNE === "false") {
-    console.log("GoodJob CRM resource event prune scheduler disabled (RESOURCE_EVENT_PRUNE=false)");
+    console.log("Golden Gain CRM resource event prune scheduler disabled (RESOURCE_EVENT_PRUNE=false)");
     return;
   }
   const intervalMs = Math.max(
@@ -6632,7 +6633,7 @@ function startResourceEventPruneScheduler() {
     Number(process.env.RESOURCE_EVENT_PRUNE_MS || 86_400_000) || 86_400_000
   );
   resourceEventPruneTimer = setInterval(() => void tickPruneResourceEvents("scheduled"), intervalMs);
-  console.log(`GoodJob CRM resource event prune scheduler enabled (every ${intervalMs}ms, retention ${RESOURCE_RETENTION_DAYS}d)`);
+  console.log(`Golden Gain CRM resource event prune scheduler enabled (every ${intervalMs}ms, retention ${RESOURCE_RETENTION_DAYS}d)`);
   void tickPruneResourceEvents("startup");
 }
 
@@ -6698,7 +6699,7 @@ export async function startServer() {
   // 部署密钥文件：deploy-secrets.json 里填好的值在此补进 env（已设置的环境变量优先）
   const deploySecrets = loadDeploySecrets();
   if (deploySecrets.appliedKeys.length) {
-    console.log(`GoodJob CRM deploy-secrets applied from ${deploySecrets.path}: ${deploySecrets.appliedKeys.join(", ")}`);
+    console.log(`Golden Gain CRM deploy-secrets applied from ${deploySecrets.path}: ${deploySecrets.appliedKeys.join(", ")}`);
   }
   const mysqlRequested = process.env.CRM_STORE === "mysql"
     || (process.env.CRM_STORE !== "memory" && Boolean(process.env.DATABASE_URL || process.env.MYSQL_URL));
@@ -6726,7 +6727,7 @@ export async function startServer() {
       throw new Error("生产环境必须配置 MySQL 持久化，禁止使用内存存储");
     }
   } catch (error) {
-    console.error(`GoodJob CRM security validation failed: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(`Golden Gain CRM security validation failed: ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
     return;
   }
@@ -6735,9 +6736,9 @@ export async function startServer() {
     try {
       const store = await createMysqlStore({ processRole: "api" });
       setStore(store);
-      console.log("GoodJob CRM using MySQL persistence");
+      console.log("Golden Gain CRM using MySQL persistence");
     } catch (error) {
-      console.error(`GoodJob CRM MySQL unavailable, startup aborted: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(`Golden Gain CRM MySQL unavailable, startup aborted: ${error instanceof Error ? error.message : String(error)}`);
       process.exit(1);
     }
   }
@@ -6757,9 +6758,9 @@ export async function startServer() {
       );
       activeIntegrationControlPlane.startMaintenance();
       setIntegrationControlPlaneService(activeIntegrationControlPlane);
-      console.log("GoodJob CRM integration control plane enabled");
+      console.log("Golden Gain CRM integration control plane enabled");
     } catch (error) {
-      console.error(`GoodJob CRM integration startup failed: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(`Golden Gain CRM integration startup failed: ${error instanceof Error ? error.message : String(error)}`);
       await getStore().close?.();
       process.exit(1);
       return;
@@ -6773,7 +6774,7 @@ export async function startServer() {
     const ids = interruptedWebsiteCandidates.map((candidate) => candidate.id);
     if (store.persistProspectCandidates) await store.persistProspectCandidates(ids);
     else await store.persist();
-    console.log(`GoodJob CRM recovered ${ids.length} interrupted website probe tasks`);
+    console.log(`Golden Gain CRM recovered ${ids.length} interrupted website probe tasks`);
   }
   const agentBackgroundRunner = new AgentBackgroundRunner(
     store,
@@ -6784,7 +6785,7 @@ export async function startServer() {
     await agentBackgroundRunner.start();
     activeAgentBackgroundRunner = agentBackgroundRunner;
   } catch (error) {
-    console.error(`GoodJob CRM Agent runner startup failed: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(`Golden Gain CRM Agent runner startup failed: ${error instanceof Error ? error.message : String(error)}`);
     await store.close?.();
     process.exit(1);
     return;
@@ -6797,7 +6798,7 @@ export async function startServer() {
     : new ProspectWorkerService({ store });
   if (!prospectWorkerService && prospectQueueRequired) {
     console.error(
-      "GoodJob CRM prospect queue startup failed: "
+      "Golden Gain CRM prospect queue startup failed: "
       + "启用强制队列时不能关闭 PROSPECT_WORKER_ENABLED"
     );
     activeAgentBackgroundRunner = null;
@@ -6810,7 +6811,7 @@ export async function startServer() {
     await prospectWorkerService?.start();
     activeProspectWorkerService = prospectWorkerService;
   } catch (error) {
-    console.error(`GoodJob CRM prospect worker startup failed: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(`Golden Gain CRM prospect worker startup failed: ${error instanceof Error ? error.message : String(error)}`);
     activeAgentBackgroundRunner = null;
     await agentBackgroundRunner.stop();
     await store.close?.();
@@ -6832,7 +6833,7 @@ export async function startServer() {
     activeAgentBackgroundRunner = null;
     await agentBackgroundRunner.stop();
     await store.close?.();
-    console.error(`GoodJob CRM prospect scheduler startup failed: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(`Golden Gain CRM prospect scheduler startup failed: ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
     return;
   }
@@ -6855,7 +6856,7 @@ export async function startServer() {
     activeAgentBackgroundRunner = null;
     await agentBackgroundRunner.stop();
     await store.close?.();
-    console.error(`GoodJob CRM super search runner startup failed: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(`Golden Gain CRM super search runner startup failed: ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
     return;
   }
@@ -6885,7 +6886,7 @@ export async function startServer() {
     activeAgentBackgroundRunner = null;
     await agentBackgroundRunner.stop();
     await store.close?.();
-    console.error(`GoodJob CRM outreach sequence runner startup failed: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(`Golden Gain CRM outreach sequence runner startup failed: ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
     return;
   }
@@ -6906,7 +6907,7 @@ export async function startServer() {
     activeAgentBackgroundRunner = null;
     await agentBackgroundRunner.stop();
     await store.close?.();
-    console.error(`GoodJob CRM customer maintenance runner startup failed: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(`Golden Gain CRM customer maintenance runner startup failed: ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
     return;
   }
@@ -7114,7 +7115,7 @@ export async function startServer() {
     activeAgentBackgroundRunner = null;
     await agentBackgroundRunner.stop();
     await store.close?.();
-    console.error(`GoodJob CRM Agent trigger runner startup failed: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(`Golden Gain CRM Agent trigger runner startup failed: ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
     return;
   }
@@ -7136,7 +7137,7 @@ export async function startServer() {
     activeAgentBackgroundRunner = null;
     await agentBackgroundRunner.stop();
     await store.close?.();
-    console.error(`GoodJob CRM sales training runner startup failed: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(`Golden Gain CRM sales training runner startup failed: ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
     return;
   }
@@ -7150,7 +7151,7 @@ export async function startServer() {
     });
     activeInboundMailWatcher = inboundMailWatcher;
     inboundMailWatcher.start();
-    console.log(`GoodJob CRM inbound mail watcher enabled (poll ${Number(process.env.INBOUND_MAIL_POLL_MS || 120_000)}ms, lookback ${Number(process.env.INBOUND_MAIL_LOOKBACK_DAYS || 7)}d)`);
+    console.log(`Golden Gain CRM inbound mail watcher enabled (poll ${Number(process.env.INBOUND_MAIL_POLL_MS || 120_000)}ms, lookback ${Number(process.env.INBOUND_MAIL_LOOKBACK_DAYS || 7)}d)`);
   }
   // ── 邮件中心：多账号收件同步（每个邮箱按自己的频率；MAIL_CENTER_SYNC=false 关闭）──
   if (process.env.MAIL_CENTER_SYNC !== "false") {
@@ -7178,7 +7179,7 @@ export async function startServer() {
     app.get("/whatsapp-plugin/*", (_req, res) => {
       res.sendFile(path.resolve(communicationFrontendDist, "index.html"));
     });
-    console.log(`GoodJob CRM serving Communication frontend from ${communicationFrontendDist}`);
+    console.log(`Golden Gain CRM serving Communication frontend from ${communicationFrontendDist}`);
   }
   if (existsSync(frontendDist)) {
     app.use(express.static(frontendDist, {
@@ -7197,11 +7198,11 @@ export async function startServer() {
       }
       res.sendFile(path.resolve(frontendDist, "index.html"));
     });
-    console.log(`GoodJob CRM serving frontend from ${frontendDist}`);
+    console.log(`Golden Gain CRM serving frontend from ${frontendDist}`);
   }
 
   const httpServer = app.listen(port, host, () => {
-    console.log(`GoodJob CRM API listening on http://${host}:${port}`);
+    console.log(`Golden Gain CRM API listening on http://${host}:${port}`);
   });
   httpServer.on("upgrade", (request, socket, head) => {
     if (!request.url?.startsWith("/whatsapp-plugin/socket.io")) return;
@@ -7218,18 +7219,18 @@ export async function startServer() {
   void startDerivePipeline()
     .then((result) => {
       if (result.reset || result.requeued || result.pruned) {
-        console.log(`GoodJob CRM file derive recovered: reset=${result.reset} requeued=${result.requeued} pruned=${result.pruned}`);
+        console.log(`Golden Gain CRM file derive recovered: reset=${result.reset} requeued=${result.requeued} pruned=${result.pruned}`);
       }
     })
     .catch((error) => {
-      console.error("GoodJob CRM file derive pipeline failed to start:", error);
+      console.error("Golden Gain CRM file derive pipeline failed to start:", error);
     });
 
   let shuttingDown = false;
   const shutdown = async (signal: NodeJS.Signals) => {
     if (shuttingDown) return;
     shuttingDown = true;
-    console.log(`GoodJob CRM received ${signal}, shutting down`);
+    console.log(`Golden Gain CRM received ${signal}, shutting down`);
     try {
       activeInboundMailWatcher?.stop();
       activeInboundMailWatcher = null;
@@ -7267,7 +7268,7 @@ export async function startServer() {
       await store.close?.();
       process.exit(0);
     } catch (error) {
-      console.error(`GoodJob CRM shutdown failed: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(`Golden Gain CRM shutdown failed: ${error instanceof Error ? error.message : String(error)}`);
       process.exit(1);
     }
   };

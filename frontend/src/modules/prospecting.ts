@@ -465,7 +465,7 @@ export function renderProspectMailPreview() {
   const preview = qs<HTMLElement>("#prospectMailPreview");
   const item = selectedProspect();
   if (!preview) return;
-  const sender = state.user?.emailSenderName || state.user?.name || "GoodJob Sales";
+  const sender = state.user?.emailSenderName || state.user?.name || "Golden Gain Sales";
   const from = state.user?.outboundEmail || "";
   preview.textContent = [
     `From: ${sender}${from ? ` <${from}>` : " <未绑定发件邮箱>"}`,
@@ -477,7 +477,7 @@ export function renderProspectMailPreview() {
 }
 
 function localProspectMailTemplate(item: WebsiteOpportunity) {
-  const sender = state.user?.emailSenderName || state.user?.name || "GoodJob Sales";
+  const sender = state.user?.emailSenderName || state.user?.name || "Golden Gain Sales";
   const signature = state.user?.emailSignature?.trim() || `Best regards,\n${sender}\nGoodJob Sales Team`;
   return {
     subject: `${item.business || "Product"} supplier support for ${item.company}`,
@@ -485,7 +485,7 @@ function localProspectMailTemplate(item: WebsiteOpportunity) {
       `Dear ${item.company} team,`,
       "",
       `I noticed your company is active in ${item.business || "international sourcing and distribution"}${item.country ? ` in ${item.country}` : ""}.`,
-      "GoodJob supports overseas buyers with product selection, specifications, certificates, quotations and sample coordination.",
+      "Golden Gain supports overseas buyers with product selection, specifications, certificates, quotations and sample coordination.",
       "",
       "May I know which product categories you are currently sourcing, and whether you have any upcoming project requirements?",
       "",

@@ -36,6 +36,7 @@ async function createLead(token: string, suffix: string) {
 try {
   const ownerToken = await login("shirley@goodjob.com");
   const otherToken = await login("mia@goodjob.com");
+  const managerToken = await login("alex@goodjob.com");
 
   const plainLeadId = await createLead(ownerToken, `plain-${Date.now()}`);
   const crossOwnerDelete = await request(`/api/leads/${plainLeadId}`, {
@@ -43,11 +44,36 @@ try {
     headers: { authorization: `Bearer ${otherToken}` },
     body: JSON.stringify({ reason: "越权删除" })
   });
-  if (crossOwnerDelete.response.status !== 404) throw new Error("lead delete must preserve owner isolation");
+  // 业务员删除线索一律被拒绝（403）；即使越权访问他人线索，也只能得到 403/404，且数据保持不变
+  if (![403, 404].includes(crossOwnerDelete.response.status)) throw new Error("lead delete must preserve owner isolation");
+  if (!getStore().leads.some((item) => item.id === plainLeadId && !item.deletedAt)) throw new Error("denied delete must keep the lead");
+
+  // 业务员不能删除线索（含移入垃圾箱和永久删除），只能标记无效并写明原因
+  const salesDelete = await request(`/api/leads/${plainLeadId}`, {
+    method: "DELETE",
+    headers: { authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ reason: "想删除" })
+  });
+  if (salesDelete.response.status !== 403) throw new Error("sales must not delete leads");
+  const invalidNoReason = await request(`/api/leads/${plainLeadId}`, {
+    method: "PATCH",
+    headers: { authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ status: "invalid" })
+  });
+  if (invalidNoReason.response.status !== 400) throw new Error("marking invalid must require a reason");
+  const invalidWithReason = await request(`/api/leads/${plainLeadId}`, {
+    method: "PATCH",
+    headers: { authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ status: "invalid", remark: "客户号码为空号，无法联系" })
+  });
+  if (!invalidWithReason.response.ok || invalidWithReason.json.lead?.status !== "invalid" || invalidWithReason.json.lead?.deletedAt) {
+    throw new Error("sales should be able to mark lead invalid with a reason");
+  }
+  if (!getStore().leads.some((item) => item.id === plainLeadId)) throw new Error("invalid lead must be kept");
 
   const trash = await request(`/api/leads/${plainLeadId}`, {
     method: "DELETE",
-    headers: { authorization: `Bearer ${ownerToken}` },
+    headers: { authorization: `Bearer ${managerToken}` },
     body: JSON.stringify({ reason: "无效线索" })
   });
   if (!trash.response.ok || !trash.json.lead?.deletedAt) throw new Error("lead trash failed");
@@ -60,12 +86,17 @@ try {
 
   await request(`/api/leads/${plainLeadId}`, {
     method: "DELETE",
-    headers: { authorization: `Bearer ${ownerToken}` },
+    headers: { authorization: `Bearer ${managerToken}` },
     body: JSON.stringify({ reason: "永久清理前置" })
   });
-  const permanent = await request(`/api/leads/${plainLeadId}/permanent`, {
+  const salesPermanent = await request(`/api/leads/${plainLeadId}/permanent`, {
     method: "DELETE",
     headers: { authorization: `Bearer ${ownerToken}` }
+  });
+  if (salesPermanent.response.status !== 403) throw new Error("sales must not permanently delete leads");
+  const permanent = await request(`/api/leads/${plainLeadId}/permanent`, {
+    method: "DELETE",
+    headers: { authorization: `Bearer ${managerToken}` }
   });
   if (!permanent.response.ok || !permanent.json.ok) throw new Error("lead permanent delete failed");
 
@@ -85,7 +116,7 @@ try {
 
   const convertedTrash = await request(`/api/leads/${convertedLeadId}`, {
     method: "DELETE",
-    headers: { authorization: `Bearer ${ownerToken}` },
+    headers: { authorization: `Bearer ${managerToken}` },
     body: JSON.stringify({ reason: "转化完成后清理线索工作区" })
   });
   if (!convertedTrash.response.ok || !convertedTrash.json.lead?.deletedAt) {
@@ -101,7 +132,7 @@ try {
 
   const convertedPermanent = await request(`/api/leads/${convertedLeadId}/permanent`, {
     method: "DELETE",
-    headers: { authorization: `Bearer ${ownerToken}` }
+    headers: { authorization: `Bearer ${managerToken}` }
   });
   if (convertedPermanent.response.status !== 400) {
     throw new Error("converted lead source record must reject permanent deletion");

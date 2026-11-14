@@ -902,6 +902,10 @@ export function registerCustomersRoutes(app: Express) {
   }));
 
   app.post("/api/customers/bulk-delete", requireAuth, asyncRoute(async (req, res) => {
+    if (req.user!.role === "sales" || !hasIamPermission(req.user!, "customer.delete")) {
+      res.status(403).json({ message: "普通业务员不能删除客户；请联系主管处理" });
+      return;
+    }
     const schema = z.object({ ids: z.array(z.string()).min(1).max(200) });
     const body = schema.parse(req.body);
     const store = getStore();
@@ -1054,6 +1058,12 @@ export function registerCustomersRoutes(app: Express) {
       res.status(404).json({ message: "跟进记录不存在或不属于该客户" });
       return;
     }
+    // 风险修复：原始沟通内容是考核证据，业务员只能改下次提醒；纠错请新增一条记录
+    if ((body.content !== undefined || body.type !== undefined) &&
+        (req.user!.role !== "admin" || !hasIamPermission(req.user!, "customer.activity.delete"))) {
+      res.status(403).json({ message: "只有管理员可更正已保存的沟通内容；业务员如有错误请新增一条更正记录；如有错误请新增一条更正记录" });
+      return;
+    }
     if (body.content !== undefined) activity.content = body.content;
     if (body.type !== undefined) activity.type = body.type;
     if (body.nextReminder !== undefined) {
@@ -1077,6 +1087,11 @@ export function registerCustomersRoutes(app: Express) {
     const store = getStore();
     const customer = findWritableCustomer(req.user!, req.params.id, res);
     if (!customer) return;
+    // 沟通记录是考核证据：只有管理员（customer.activity.delete）可删，业务员和主管都不行
+    if (req.user!.role !== "admin" || !hasIamPermission(req.user!, "customer.activity.delete")) {
+      res.status(403).json({ message: "沟通记录不可删除；如有错误请新增更正记录，或联系管理员" });
+      return;
+    }
     const index = store.customerActivities.findIndex(
       (item) => item.id === req.params.activityId && item.customerId === customer.id
     );

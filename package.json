@@ -28,7 +28,7 @@
     "goodjob-runner"
   ],
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.5"
   },
   "dependencies": {
     "html-to-image": "^1.11.13",

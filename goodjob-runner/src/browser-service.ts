@@ -197,10 +197,14 @@ export async function startBrowserService(
   ];
   if (configuration.proxyServer) browserArgs.push(`--proxy-server=${configuration.proxyServer}`);
   if (process.env.NODE_ENV === "test") browserArgs.push("--headless=new", "--disable-gpu");
+  const isCiTest = process.env.CI === "true" && process.env.NODE_ENV === "test";
+  if (isCiTest) browserArgs.push("--no-sandbox", "--disable-dev-shm-usage");
   browserArgs.push("about:blank");
+  const browserEnv = { ...process.env };
+  if (isCiTest) delete browserEnv.DBUS_SESSION_BUS_ADDRESS;
   const browserChild = spawn(configuration.executablePath, browserArgs, {
     cwd: configuration.outputDir,
-    env: process.env,
+    env: browserEnv,
     shell: false,
     stdio: ["ignore", "pipe", "pipe"]
   });
@@ -208,7 +212,7 @@ export async function startBrowserService(
   const captureBrowser = (chunk: Buffer) => { browserDiagnostics = `${browserDiagnostics}${chunk.toString("utf8")}`.slice(-6_000); };
   browserChild.stdout?.on("data", captureBrowser);
   browserChild.stderr?.on("data", captureBrowser);
-  const browserDeadline = Date.now() + START_TIMEOUT_MS;
+  const browserDeadline = Date.now() + (isCiTest ? START_TIMEOUT_MS * 2 : START_TIMEOUT_MS);
   while (Date.now() < browserDeadline && browserChild.exitCode === null && !browserChild.signalCode) {
     if (await isBrowserCdpReady(configuration, 500)) break;
     await new Promise((resolve) => setTimeout(resolve, 150));

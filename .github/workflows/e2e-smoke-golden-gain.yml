@@ -1,0 +1,32 @@
+name: Golden Gain brand and permission E2E smoke
+on:
+  push:
+    branches: [feature/golden-gain-hardening-20261114]
+    paths:
+      - frontend/tests/golden-gain-smoke.spec.ts
+      - .github/workflows/e2e-smoke-golden-gain.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI: 'true'
+      NODE_ENV: e2e
+      JWT_SECRET: golden-gain-smoke-ci-secret-at-least-32-characters
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Check real Chromium binary
+        run: |
+          if ! command -v google-chrome >/dev/null && ! command -v google-chrome-stable >/dev/null; then
+            npx playwright install --with-deps chrome
+          fi
+      - name: Brand, manager and staff data isolation browser smoke
+        run: npm run test:e2e --workspace frontend -- tests/golden-gain-smoke.spec.ts --workers=1

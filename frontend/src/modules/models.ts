@@ -3589,6 +3589,32 @@ export interface ExecutiveReport {
     weight: number;
     weightedAmounts: ReportMoneyRow[];
   }>;
+  management?: null | {
+    month: string;
+    today: string;
+    timezone: string;
+    target: number;
+    scope: string;
+    definitions: { candidates: string; verified: string; sales: string; tasks: string };
+    rows: Array<{
+      ownerId: string;
+      owner: string;
+      todayTasks: number;
+      todayCompleted: number;
+      monthTasks: number;
+      monthCompleted: number;
+      overdueTasks: number;
+      submittedToday: boolean;
+      newLeads: number;
+      communicationCandidates: number;
+      verifiedWhatsAppReplies: number;
+      target: number;
+      verifiedProgressPercent: number;
+      followUps: number;
+      wonDeals: number;
+      wonAmounts: ReportMoneyRow[];
+    }>;
+  };
   performanceTitle: string;
   performance: Array<{
     ownerId: string;

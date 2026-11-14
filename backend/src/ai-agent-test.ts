@@ -61,7 +61,7 @@ async function main() {
   assert.equal(greetingProgress[1]?.requestKind, "conversation");
   assert.equal(greetingRun.status, "completed");
   assert.equal(greetingRun.steps.length, 0);
-  assert.match(greetingRun.summary, /你好|GoodJob CRM/u);
+  assert.match(greetingRun.summary, /你好|Golden Gain CRM/u);
   assert.equal(greetingRun.events.some((item) => item.message.includes("商机")), false);
 
   const readRun = await createAgentPlan(fixture.store, admin, "检查当前商机管道");

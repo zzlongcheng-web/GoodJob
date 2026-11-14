@@ -59,10 +59,10 @@ check("token 够长、URL 安全、不重复", () => {
 });
 
 check("密码哈希：正确通过、错误拒绝、不存明文", () => {
-  const stored = hashSharePassword("GoodJob-2026");
+  const stored = hashSharePassword("Golden Gain-2026");
   assert.ok(stored.startsWith("scrypt$"));
-  assert.ok(!stored.includes("GoodJob-2026"), "哈希里不能出现明文密码");
-  assert.equal(verifySharePassword("GoodJob-2026", stored), true);
+  assert.ok(!stored.includes("Golden Gain-2026"), "哈希里不能出现明文密码");
+  assert.equal(verifySharePassword("Golden Gain-2026", stored), true);
   assert.equal(verifySharePassword("goodjob-2026", stored), false);
   assert.equal(verifySharePassword("", stored), false);
   // 空哈希 = 没设密码，谁拿到链接都能看
@@ -71,7 +71,7 @@ check("密码哈希：正确通过、错误拒绝、不存明文", () => {
   assert.equal(verifySharePassword("x", "garbage"), false);
   assert.equal(verifySharePassword("x", "scrypt$onlytwo"), false);
   // 同一密码两次哈希必须不同（盐不同）
-  assert.notEqual(hashSharePassword("GoodJob-2026"), stored);
+  assert.notEqual(hashSharePassword("Golden Gain-2026"), stored);
 });
 
 check("shareBlockReason 四种状态", () => {
@@ -106,7 +106,7 @@ check("水印文字含日期与可追溯编号", () => {
   // 客户名过长要截断，否则水印铺出去会盖满整页
   assert.ok(buildWatermarkText({ customerName: "长".repeat(80), token: "t" }).length <= 40);
   // 什么都不知道时也要有兜底，不能是空串
-  assert.ok(buildWatermarkText({}).includes("GoodJob"));
+  assert.ok(buildWatermarkText({}).includes("Golden Gain"));
 });
 
 check("分享页：拦截/密码/预览/下载四种形态", () => {
@@ -156,7 +156,7 @@ assert.equal((await PDFDocument.load(twice)).getPageCount(), 3);
 passed += 1;
 
 // 纯英文走内置字体：机器上没有任何中文字体时也不能整条链路失败
-const ascii = await watermarkPdf(source, "GoodJob 2026-10-28 abcdef");
+const ascii = await watermarkPdf(source, "Golden Gain 2026-10-28 abcdef");
 assert.equal((await PDFDocument.load(ascii)).getPageCount(), 3);
 passed += 1;
 
@@ -174,7 +174,7 @@ check("没有中文字形时降级成 ASCII，不让下载整条链路 500", () 
   assert.match(fallback, /2026-10-28/u);
   assert.match(fallback, /abcdef/u);
   // 整段中文剥完什么都不剩时，必须给一个能画出来的非空串
-  assert.equal(asciiWatermarkFallback("上海朋绎机械"), "GoodJob");
+  assert.equal(asciiWatermarkFallback("上海朋绎机械"), "Golden Gain");
 });
 
 check("TTC 集合拆包：重写 table 偏移，直接切片会得到坏字体", () => {

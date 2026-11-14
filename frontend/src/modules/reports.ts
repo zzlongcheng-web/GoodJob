@@ -10,6 +10,52 @@ import { badge, escapeHtml, qs } from "./shared";
 import { api, toast } from "./ui";
 import { reportMoneyHtml, reportMoneyText } from "./customer-intake";
 
+let selectedManagementMonth = "";
+
+function renderManagementPerformance(report: ExecutiveReport) {
+  const anchor = qs<HTMLElement>("#reportPerformanceCards");
+  let panel = qs<HTMLElement>("#managerPerformancePanel");
+  const data = report.management;
+  if (!data) { panel?.remove(); return; }
+  if (!panel && anchor?.parentElement) {
+    panel = document.createElement("section");
+    panel.id = "managerPerformancePanel";
+    panel.className = "report-performance-card";
+    panel.style.marginTop = "20px";
+    anchor.parentElement.insertAdjacentElement("afterend", panel);
+  }
+  if (!panel) return;
+  if (!selectedManagementMonth) selectedManagementMonth = data.month;
+  const rows = data.rows.map((item) => {
+    const progress = Math.max(0, Math.min(100, Math.round(item.verifiedProgressPercent)));
+    const daily = item.todayTasks ? Math.round(item.todayCompleted / item.todayTasks * 100) : 0;
+    const monthly = item.monthTasks ? Math.round(item.monthCompleted / item.monthTasks * 100) : 0;
+    return "<tr><td>" + escapeHtml(item.owner) + "</td><td>" + item.todayCompleted + "/" + item.todayTasks + " (" + daily + "%)</td>" +
+      "<td>" + item.monthCompleted + "/" + item.monthTasks + " (" + monthly + "%)</td>" +
+      "<td>" + (item.submittedToday ? "已提交" : "未提交") + "</td><td>" + item.newLeads + "</td><td>" +
+      item.communicationCandidates + " (待核)</td><td><b>" + item.verifiedWhatsAppReplies + "/" + item.target +
+      "</b><div style='background:#dce4e8;height:5px;min-width:80px'><div style='background:#218665;height:5px;width:" + progress + "%'></div></div></td><td>" +
+      item.followUps + "</td><td>" + item.wonDeals + "</td><td>" + escapeHtml(reportMoneyText(item.wonAmounts)) +
+      "</td><td>" + item.overdueTasks + "</td></tr>";
+  }).join("");
+  panel.innerHTML =
+    "<div style='display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;align-items:center'>" +
+    "<div><h3>业务员每日任务与月度业绩</h3><small>" + escapeHtml(data.scope) + " · " + escapeHtml(data.timezone) +
+    "</small></div><label>查看月份 <input id='managerPerformanceMonth' type='month' value='" + escapeHtml(selectedManagementMonth) +
+    "'></label></div><div style='overflow-x:auto;margin-top:12px'><table style='min-width:1080px;width:100%;text-align:left'>" +
+    "<thead><tr><th>业务员</th><th>今日任务</th><th>本月任务</th><th>今日日报</th><th>新增线索</th><th>沟通候选</th><th>有回复证据/61</th><th>本月跟进</th><th>成交单</th><th>成交金额(原币)</th><th>逾期</th></tr></thead><tbody>" +
+    (rows || "<tr><td colspan='11'>当前范围暂无业务员</td></tr>") + "</tbody></table></div>" +
+    "<p style='font-size:12px;line-height:1.65;margin-top:12px'><b>口径说明：</b>" +
+    escapeHtml(data.definitions.candidates) + "；" + escapeHtml(data.definitions.verified) + "；" +
+    escapeHtml(data.definitions.sales) + "；" + escapeHtml(data.definitions.tasks) + "。</p>";
+  qs<HTMLInputElement>("#managerPerformanceMonth", panel)?.addEventListener("change", (event) => {
+    const value = (event.currentTarget as HTMLInputElement).value;
+    if (!/^\d{4}-(?:0[1-9]|1[0-2])$/.test(value)) return;
+    selectedManagementMonth = value;
+    void refreshExecutiveReport();
+  });
+}
+
 function renderExecutiveReport(report: ExecutiveReport) {
   state.executiveReport = report;
   state.reportNote = report.reportNote || "";
@@ -26,7 +72,7 @@ function renderExecutiveReport(report: ExecutiveReport) {
     if (node) node.innerHTML = value;
   };
   setText("#reportPeriod", `${report.title} · ${report.period.label}`);
-  setText("#reportGeneratedAt", `GoodJob CRM · 生成于 ${generatedText}`);
+  setText("#reportGeneratedAt", `Golden Gain CRM · 生成于 ${generatedText}`);
   setText("#reportHeadline", report.headline);
   setText("#reportHeroNote", state.reportNote || report.note);
   setText("#reportScope", `范围：${report.scope.label}`);
@@ -85,6 +131,7 @@ function renderExecutiveReport(report: ExecutiveReport) {
     </article>
   `).join("") : `<div class="report-empty">暂无可展示人员数据</div>`);
   setHtml("#reportDefinitions", report.definitions.map((item) => `<li>${escapeHtml(item)}</li>`).join(""));
+  renderManagementPerformance(report);
   const riskButton = qs<HTMLButtonElement>("#reportRiskDetailButton");
   if (riskButton) {
     riskButton.textContent = `查看风险明细（${report.riskRows.length}）`;
@@ -96,7 +143,7 @@ export async function refreshExecutiveReport(showToast = false) {
   const button = qs<HTMLButtonElement>("#reportRefreshButton");
   try {
     if (button) { button.disabled = true; button.textContent = "刷新中"; }
-    const report = await api<ExecutiveReport>("/api/reports/executive");
+    const report = await api<ExecutiveReport>("/api/reports/executive" + (selectedManagementMonth ? "?managementMonth=" + encodeURIComponent(selectedManagementMonth) : ""));
     renderExecutiveReport(report);
     if (showToast) toast("经营快照已刷新");
   } catch (error) {
@@ -156,7 +203,7 @@ export async function exportReport() {
   const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = "GoodJob-CRM-经营汇报.txt";
+  link.download = "Golden Gain-CRM-经营汇报.txt";
   link.click();
   URL.revokeObjectURL(link.href);
   toast("汇报已生成下载");
