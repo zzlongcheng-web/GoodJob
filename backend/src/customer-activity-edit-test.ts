@@ -169,6 +169,18 @@ try {
   });
   check("sales 改他人名下客户的跟进 → 404", forbidden.response.status === 404, forbidden.response.status);
 
+  /* ---------------- 普通员工不能删除自己名下的客户及沟通记录 ---------------- */
+  const ownActivityDelete = await request("/api/customers/c1/activities/ca1", salesToken, { method: "DELETE" });
+  check("sales 删除本人客户跟进记录必须 → 403", ownActivityDelete.response.status === 403, ownActivityDelete.response.status);
+  check("sales 不能删除自己的沟通记录", getStore().customerActivities.some((item) => item.id === "ca1"));
+
+  const ownCustomerBulkDelete = await request("/api/customers/bulk-delete", salesToken, {
+    method: "POST",
+    body: JSON.stringify({ ids: ["c1"] })
+  });
+  check("sales 批量删除本人客户必须 → 403", ownCustomerBulkDelete.response.status === 403, ownCustomerBulkDelete.response.status);
+  check("sales 批量删除不能改变客户数据", getStore().customers.some((item) => item.id === "c1"));
+
   /* ---------------- DELETE 撤销 ---------------- */
   const created = await request("/api/customers/c1/activities", management, {
     method: "POST",
