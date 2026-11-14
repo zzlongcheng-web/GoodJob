@@ -27,12 +27,6 @@ jobs:
           node-version: '22'
           cache: npm
 
-        shell: bash
-        run: |
-          echo '3e424d5092e9ed9c35473007fa5f4f1b3fc7dbed5d47563980987f8af291a58a  .ci-v5-input/goodjob-c009-fixes-v5.patch' | sha256sum -c -
-          patch --batch --fuzz=0 -p1 --dry-run < .ci-v5-input/goodjob-c009-fixes-v5.patch
-          patch --batch --fuzz=0 -p1 < .ci-v5-input/goodjob-c009-fixes-v5.patch
-          git diff --stat
       - name: Install root and WhatsApp plugin dependencies
         run: |
           npm ci
@@ -53,12 +47,6 @@ jobs:
           node-version: '22'
           cache: npm
 
-        shell: bash
-        run: |
-          echo '3e424d5092e9ed9c35473007fa5f4f1b3fc7dbed5d47563980987f8af291a58a  .ci-v5-input/goodjob-c009-fixes-v5.patch' | sha256sum -c -
-          patch --batch --fuzz=0 -p1 --dry-run < .ci-v5-input/goodjob-c009-fixes-v5.patch
-          patch --batch --fuzz=0 -p1 < .ci-v5-input/goodjob-c009-fixes-v5.patch
-          git diff --stat
       - name: Install root and WhatsApp plugin dependencies
         run: |
           npm ci
@@ -95,12 +83,6 @@ jobs:
           node-version: '22'
           cache: npm
 
-        shell: bash
-        run: |
-          echo '3e424d5092e9ed9c35473007fa5f4f1b3fc7dbed5d47563980987f8af291a58a  .ci-v5-input/goodjob-c009-fixes-v5.patch' | sha256sum -c -
-          patch --batch --fuzz=0 -p1 --dry-run < .ci-v5-input/goodjob-c009-fixes-v5.patch
-          patch --batch --fuzz=0 -p1 < .ci-v5-input/goodjob-c009-fixes-v5.patch
-          git diff --stat
       - name: Install dependencies
         run: |
           npm ci
@@ -139,12 +121,6 @@ jobs:
           node-version: '22'
           cache: npm
 
-        shell: bash
-        run: |
-          echo '3e424d5092e9ed9c35473007fa5f4f1b3fc7dbed5d47563980987f8af291a58a  .ci-v5-input/goodjob-c009-fixes-v5.patch' | sha256sum -c -
-          patch --batch --fuzz=0 -p1 --dry-run < .ci-v5-input/goodjob-c009-fixes-v5.patch
-          patch --batch --fuzz=0 -p1 < .ci-v5-input/goodjob-c009-fixes-v5.patch
-          git diff --stat
       - name: Install dependencies and compile connector SDK
         run: |
           npm ci
@@ -186,12 +162,6 @@ jobs:
           node-version: '22'
           cache: npm
 
-        shell: bash
-        run: |
-          echo '3e424d5092e9ed9c35473007fa5f4f1b3fc7dbed5d47563980987f8af291a58a  .ci-v5-input/goodjob-c009-fixes-v5.patch' | sha256sum -c -
-          patch --batch --fuzz=0 -p1 --dry-run < .ci-v5-input/goodjob-c009-fixes-v5.patch
-          patch --batch --fuzz=0 -p1 < .ci-v5-input/goodjob-c009-fixes-v5.patch
-          git diff --stat
       - name: Install root and WhatsApp plugin dependencies
         run: |
           npm ci
