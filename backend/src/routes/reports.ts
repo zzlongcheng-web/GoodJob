@@ -9,6 +9,7 @@ import { z } from "zod";
 import { canSeeOwner, canSeePersonalData, requireAuth } from "../auth.js";
 import { type Customer, type Deal, type Todo } from "../types.js";
 import { getStore } from "../store.js";
+import { buildManagementPerformance } from "../management-performance.js";
 import {
   archiveExpiredTodos,
   asyncRoute,
@@ -509,6 +510,11 @@ export function registerReportsRoutes(app: Express) {
   }));
 
   app.get("/api/reports/executive", requireAuth, (req, res) => {
+    const requestedMonth = req.query.managementMonth;
+    if (requestedMonth !== undefined && (typeof requestedMonth !== "string" || !/^\d{4}-(?:0[1-9]|1[0-2])$/.test(requestedMonth))) {
+      res.status(400).json({ message: "管理报表月份格式不正确" });
+      return;
+    }
     const store = getStore();
     const reportOwner = store.users.find((user) => user.id === req.user!.id);
     const now = new Date();
@@ -697,6 +703,7 @@ export function registerReportsRoutes(app: Express) {
       })),
       performanceTitle: scopeKey === "self" ? "个人经营效率" : "成员经营对比",
       performance,
+      management: buildManagementPerformance(store, req.user!, (typeof requestedMonth === "string" ? requestedMonth : reportDate(now).slice(0, 7)), now),
       riskRows,
       actions,
       definitions: [
