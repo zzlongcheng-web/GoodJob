@@ -108,7 +108,12 @@ export function parseLeadText(input: string): ParsedLeadText {
   const phoneMatches = (text.match(/(?:\+|00)\d[\d\s\-().]{7,18}\d/g) || []).map(normalizePhone).filter(Boolean);
   if (!result.phone) result.phone = phoneMatches.find((p) => p !== result.whatsapp) || "";
   if (!result.phone && !result.whatsapp) {
-    const loose = (text.match(/\b\d[\d\s\-]{8,16}\d\b/g) || []).map(normalizePhone).filter(Boolean);
+    // Only accept an unlabelled local number on a phone-only line. Numbers embedded in
+    // company names, timestamps, registration IDs and invoice numbers are not contacts.
+    const loose = lines
+      .filter((line) => !COMPANY_HINT.test(line) && /^\+?[\d\s().-]{9,22}$/.test(line))
+      .map(normalizePhone)
+      .filter(Boolean);
     result.phone = loose[0] || "";
   }
   // 文中出现 WhatsApp 字样且只有一个号码：该号码同时作为 WhatsApp
