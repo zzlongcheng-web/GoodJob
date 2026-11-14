@@ -1,0 +1,142 @@
+name: GoodJob c009 v2 isolated patch verification
+
+on:
+  push:
+    branches: [ci-verify-c009-v2]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CI: 'true'
+  NODE_ENV: test
+  JWT_SECRET: 'goodjob-ci-patch-v2-test-secret-at-least-32-characters'
+
+jobs:
+  build-and-self-tests:
+    name: Build all + npm test
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Validate exact uploaded patch and apply only in temporary runner
+        run: |
+          echo 'f3bfb00b0cc99ac18641295ffa3fc722281a2d7cabc38bb9d66d8f7635690a31  .ci-v2-input/goodjob-c009-fixes-v2.patch' | sha256sum -c -
+          git merge-base --is-ancestor c009243dcfcd3afc38d979207d9efcc8ace8c295 HEAD
+          patch --batch --fuzz=0 -p1 --dry-run < .ci-v2-input/goodjob-c009-fixes-v2.patch
+          patch --batch --fuzz=0 -p1 < .ci-v2-input/goodjob-c009-fixes-v2.patch
+          git diff --stat
+      - name: Install root and standalone plugin dependencies
+        run: |
+          npm ci
+          npm --prefix whatsapp-plugin ci
+      - name: Build all workspaces
+        run: npm run build
+      - name: Run complete self-test suite
+        run: npm test
+
+  focused-permissions:
+    name: Focused security regression tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Verify immutable patch and apply in runner
+        run: |
+          echo 'f3bfb00b0cc99ac18641295ffa3fc722281a2d7cabc38bb9d66d8f7635690a31  .ci-v2-input/goodjob-c009-fixes-v2.patch' | sha256sum -c -
+          patch --batch --fuzz=0 -p1 --dry-run < .ci-v2-input/goodjob-c009-fixes-v2.patch
+          patch --batch --fuzz=0 -p1 < .ci-v2-input/goodjob-c009-fixes-v2.patch
+      - name: Install dependencies and build SDK
+        run: |
+          npm ci
+          npm run build --workspace @goodjob/integration-connector-sdk
+      - name: Exercise permission and customer history tests separately
+        shell: bash
+        run: |
+          cd backend
+          failed=0
+          for file in src/iam/iam-foundation-test.ts src/iam/iam-capabilities-test.ts src/lead-deletion-test.ts src/customer-activity-edit-test.ts src/lead-assignment-test.ts; do
+            echo "::group::$file"
+            if node ../scripts/run-with-env.mjs NODE_ENV=test tsx "$file"; then
+              echo "PASS $file"
+            else
+              echo "FAIL $file"
+              failed=1
+            fi
+            echo '::endgroup::'
+          done
+          exit "$failed"
+
+  mysql-integration:
+    name: MySQL integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ci_root_password_only
+          MYSQL_DATABASE: goodjob_ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci_root_password_only"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    env:
+      MYSQL_TEST_ADMIN_URL: mysql://root:ci_root_password_only@127.0.0.1:3306/mysql
+      MYSQL_TEST_APP_URL: mysql://goodjob_ci:ci_app_password_only@127.0.0.1:3306/
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Verify immutable patch and apply in runner
+        run: |
+          echo 'f3bfb00b0cc99ac18641295ffa3fc722281a2d7cabc38bb9d66d8f7635690a31  .ci-v2-input/goodjob-c009-fixes-v2.patch' | sha256sum -c -
+          patch --batch --fuzz=0 -p1 --dry-run < .ci-v2-input/goodjob-c009-fixes-v2.patch
+          patch --batch --fuzz=0 -p1 < .ci-v2-input/goodjob-c009-fixes-v2.patch
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm --prefix whatsapp-plugin ci
+      - name: Configure ephemeral MySQL test user
+        run: |
+          mysql --protocol=tcp --host=127.0.0.1 --port=3306 --user=root --password=ci_root_password_only <<'SQL'
+          CREATE USER IF NOT EXISTS 'goodjob_ci'@'%' IDENTIFIED BY 'ci_app_password_only';
+          GRANT ALL PRIVILEGES ON *.* TO 'goodjob_ci'@'%';
+          FLUSH PRIVILEGES;
+          SQL
+      - name: Configure ephemeral MySQL profile
+        run: |
+          cat > .env.test.local <<'EOF'
+          APP_DATABASE_PROFILE=test
+          CRM_STORE=mysql
+          CRM_SEED_DEVELOPMENT_DATA=true
+          MYSQL_TEST_ADMIN_URL=mysql://root:ci_root_password_only@127.0.0.1:3306/mysql
+          MYSQL_TEST_APP_URL=mysql://goodjob_ci:ci_app_password_only@127.0.0.1:3306/
+          JWT_SECRET=goodjob-ci-patch-v2-test-secret-at-least-32-characters
+          EOF
+          chmod 600 .env.test.local
+      - name: Run MySQL suite
+        run: npm run test:mysql
