@@ -69,6 +69,7 @@ jobs:
         shell: bash
         run: |
           cd backend
+          export PATH="$PWD/../node_modules/.bin:$PATH"
           failed=0
           for file in src/iam/iam-foundation-test.ts src/iam/iam-capabilities-test.ts src/lead-deletion-test.ts src/customer-activity-edit-test.ts src/lead-assignment-test.ts; do
             echo "::group::$file"
