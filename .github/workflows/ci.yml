@@ -1,0 +1,89 @@
+name: GoodJob CRM CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: goodjob-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build and self-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CI: "true"
+      NODE_ENV: test
+      JWT_SECRET: goodjob-ci-jwt-secret-not-for-production-32-characters
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Compile all workspaces and WhatsApp plugin
+        run: npm run build
+      - name: Run project self-tests
+        run: npm test
+
+  mysql-tests:
+    name: MySQL integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ci_root_password_only
+          MYSQL_DATABASE: goodjob_ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci_root_password_only"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    env:
+      CI: "true"
+      NODE_ENV: test
+      JWT_SECRET: goodjob-ci-jwt-secret-not-for-production-32-characters
+      MYSQL_TEST_ADMIN_URL: mysql://root:ci_root_password_only@127.0.0.1:3306/mysql
+      MYSQL_TEST_APP_URL: mysql://goodjob_ci:ci_app_password_only@127.0.0.1:3306/
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Configure isolated ephemeral MySQL test account
+        run: |
+          mysql --protocol=tcp --host=127.0.0.1 --port=3306 --user=root --password=ci_root_password_only <<'SQL'
+          CREATE USER IF NOT EXISTS 'goodjob_ci'@'%' IDENTIFIED BY 'ci_app_password_only';
+          GRANT ALL PRIVILEGES ON *.* TO 'goodjob_ci'@'%';
+          FLUSH PRIVILEGES;
+          SQL
+      - name: Create temporary test profile
+        run: |
+          cat > .env.test.local <<'EOF'
+          APP_DATABASE_PROFILE=test
+          CRM_STORE=mysql
+          CRM_SEED_DEVELOPMENT_DATA=true
+          MYSQL_TEST_ADMIN_URL=mysql://root:ci_root_password_only@127.0.0.1:3306/mysql
+          MYSQL_TEST_APP_URL=mysql://goodjob_ci:ci_app_password_only@127.0.0.1:3306/
+          JWT_SECRET=goodjob-ci-jwt-secret-not-for-production-32-characters
+          EOF
+          chmod 600 .env.test.local
+      - name: Run independent MySQL test suite
+        run: npm run test:mysql
