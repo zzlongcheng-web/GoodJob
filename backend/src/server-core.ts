@@ -393,6 +393,7 @@ function iamBusinessPermission(req: Request) {
   }
   if (pathName.startsWith("/api/leads")) {
     if (pathName.includes("/export")) return "lead.export";
+    if (pathName.includes("/parse-")) return "lead.create";
     if (method === "GET") return "lead.read";
     if (method === "DELETE") return "lead.delete";
     if (method === "POST" && /^\/api\/leads\/?$/u.test(pathName)) return "lead.create";

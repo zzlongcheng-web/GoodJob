@@ -962,6 +962,11 @@ export async function createAppRuntime(config: AppConfig): Promise<AppRuntime> {
   app.delete(
     "/api/v1/accounts/:id",
     asyncRoute(async (request, response) => {
+      // 风险修复：删除账号会级联删除该账号下全部会话和消息，默认禁止
+      if (process.env.PLUGIN_ALLOW_ACCOUNT_DELETE !== "true") {
+        response.status(403).json({ error: "Account deletion is disabled because it permanently erases all chat history" });
+        return;
+      }
       const account = await ownedAccount(request, routeParam(request.params.id));
       const routingReferences = await repository.countRoutingReferences(account.id);
       if (routingReferences > 0) {

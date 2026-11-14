@@ -8,10 +8,20 @@ import {
 assert.equal(IAM_FOUNDATION_SCHEMA_VERSION, "iam-foundation-v1");
 assert.equal(new Set(IAM_PERMISSION_CATALOG.map((item) => item.code)).size, IAM_PERMISSION_CATALOG.length);
 assert.equal(legacyPermissionScope("sales", "customer.read"), "self");
-assert.equal(legacyPermissionScope("sales", "customer.export"), "self");
+assert.equal(legacyPermissionScope("sales", "customer.export"), null);
+assert.equal(legacyPermissionScope("sales", "deal.delete"), null);
+assert.notEqual(legacyPermissionScope("manager", "deal.delete"), null);
 assert.equal(legacyPermissionScope("manager", "customer.export"), "org_subtree");
 assert.equal(legacyPermissionScope("admin", "role.manage"), "tenant");
 assert.equal(legacyPermissionScope("sales", "customer.pool.claim"), "public_pool");
+assert.equal(legacyPermissionScope("sales", "lead.delete"), null);
+assert.equal(legacyPermissionScope("sales", "customer.delete"), null);
+assert.equal(legacyPermissionScope("sales", "customer.activity.delete"), null);
+assert.equal(legacyPermissionScope("manager", "lead.delete"), "org_subtree");
+assert.equal(legacyPermissionScope("manager", "customer.delete"), "org_subtree");
+// 沟通记录删除/改正文：只有管理员，主管也不行
+assert.equal(legacyPermissionScope("manager", "customer.activity.delete"), null);
+assert.equal(legacyPermissionScope("admin", "customer.activity.delete"), "tenant");
 assert.ok(IAM_PERMISSION_CATALOG.every((item) => item.code.includes(".") && item.scopeModes.length > 0));
 
 console.log(JSON.stringify({
