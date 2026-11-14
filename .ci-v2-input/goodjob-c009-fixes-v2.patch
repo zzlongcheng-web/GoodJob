@@ -1,0 +1,459 @@
+diff -ru c009_base/backend/src/customer-activity-edit-test.ts c009_fix/backend/src/customer-activity-edit-test.ts
+--- c009_base/backend/src/customer-activity-edit-test.ts	2026-11-14 03:25:30.497831391 -0500
++++ c009_fix/backend/src/customer-activity-edit-test.ts	2026-11-14 03:31:32.890334904 -0500
+@@ -61,8 +61,10 @@
+ 
+ try {
+   const store = getStore();
+-  const manager = store.users.find((item) => item.email === "alex@goodjob.com")!;
+-  const management = await login("alex@goodjob.com");
++  const manager = store.users.find((item) => item.email === "admin@goodjob.com")!;
++  // 沟通记录的更正/撤销只有管理员可做（主管、业务员都不行）
++  const management = await login("admin@goodjob.com");
++  const managerToken = await login("alex@goodjob.com");
+   const salesToken = await login("shirley@goodjob.com");
+ 
+   // 种子数据：c1/c2 属 shirley(europe)，c3 属 mia(europe)；ca1→c1, ca2→c2, ca3→c3
+@@ -213,7 +215,15 @@
+   );
+ 
+   const removeForbidden = await request("/api/customers/c3/activities/ca3", salesToken, { method: "DELETE" });
+-  check("sales 撤销他人名下客户的跟进 → 404", removeForbidden.response.status === 404, removeForbidden.response.status);
++  check("sales 撤销他人名下客户的跟进 → 403 或 404", [403, 404].includes(removeForbidden.response.status), removeForbidden.response.status);
++  const managerDelete = await request("/api/customers/c1/activities/ca1", managerToken, { method: "DELETE" });
++  check("主管撤销沟通记录 → 403（只有管理员可以）", managerDelete.response.status === 403, managerDelete.response.status);
++  const managerEdit = await request("/api/customers/c1/activities/ca1", managerToken, { method: "PATCH", body: JSON.stringify({ content: "主管改写" }) });
++  check("主管改写沟通正文 → 403", managerEdit.response.status === 403, managerEdit.response.status);
++  const salesEdit = await request("/api/customers/c1/activities/ca1", salesToken, { method: "PATCH", body: JSON.stringify({ content: "业务员改写" }) });
++  check("业务员改写沟通正文 → 403", salesEdit.response.status === 403, salesEdit.response.status);
++  const salesReminder = await request("/api/customers/c1/activities/ca1", salesToken, { method: "PATCH", body: JSON.stringify({ nextReminder: "下周一" }) });
++  check("业务员只改下次提醒 → 200", salesReminder.response.status === 200, salesReminder.response.status);
+   check(
+     "越权撤销未误删目标记录",
+     getStore().customerActivities.some((item) => item.id === "ca3")
+diff -ru c009_base/backend/src/iam/iam-capabilities-test.ts c009_fix/backend/src/iam/iam-capabilities-test.ts
+--- c009_base/backend/src/iam/iam-capabilities-test.ts	2026-11-14 03:25:30.499645897 -0500
++++ c009_fix/backend/src/iam/iam-capabilities-test.ts	2026-11-14 03:25:30.607282380 -0500
+@@ -14,7 +14,8 @@
+ 
+ const sales = buildLegacyCapabilitySnapshot(actor("sales"));
+ assert.ok(sales.permissions["customer.read"]?.includes("self"));
+-assert.ok(sales.permissions["customer.export"]?.includes("self"));
++assert.equal(sales.permissions["customer.export"], undefined);
++assert.equal(sales.permissions["deal.delete"], undefined);
+ assert.ok(sales.permissions["customer.pool.claim"]?.includes("public_pool"));
+ 
+ const manager = buildLegacyCapabilitySnapshot(actor("manager"));
+diff -ru c009_base/backend/src/iam/iam-foundation-test.ts c009_fix/backend/src/iam/iam-foundation-test.ts
+--- c009_base/backend/src/iam/iam-foundation-test.ts	2026-11-14 03:25:30.499670637 -0500
++++ c009_fix/backend/src/iam/iam-foundation-test.ts	2026-11-14 03:31:17.221249153 -0500
+@@ -8,10 +8,20 @@
+ assert.equal(IAM_FOUNDATION_SCHEMA_VERSION, "iam-foundation-v1");
+ assert.equal(new Set(IAM_PERMISSION_CATALOG.map((item) => item.code)).size, IAM_PERMISSION_CATALOG.length);
+ assert.equal(legacyPermissionScope("sales", "customer.read"), "self");
+-assert.equal(legacyPermissionScope("sales", "customer.export"), "self");
++assert.equal(legacyPermissionScope("sales", "customer.export"), null);
++assert.equal(legacyPermissionScope("sales", "deal.delete"), null);
++assert.notEqual(legacyPermissionScope("manager", "deal.delete"), null);
+ assert.equal(legacyPermissionScope("manager", "customer.export"), "org_subtree");
+ assert.equal(legacyPermissionScope("admin", "role.manage"), "tenant");
+ assert.equal(legacyPermissionScope("sales", "customer.pool.claim"), "public_pool");
++assert.equal(legacyPermissionScope("sales", "lead.delete"), null);
++assert.equal(legacyPermissionScope("sales", "customer.delete"), null);
++assert.equal(legacyPermissionScope("sales", "customer.activity.delete"), null);
++assert.equal(legacyPermissionScope("manager", "lead.delete"), "org_subtree");
++assert.equal(legacyPermissionScope("manager", "customer.delete"), "org_subtree");
++// 沟通记录删除/改正文：只有管理员，主管也不行
++assert.equal(legacyPermissionScope("manager", "customer.activity.delete"), null);
++assert.equal(legacyPermissionScope("admin", "customer.activity.delete"), "tenant");
+ assert.ok(IAM_PERMISSION_CATALOG.every((item) => item.code.includes(".") && item.scopeModes.length > 0));
+ 
+ console.log(JSON.stringify({
+diff -ru c009_base/backend/src/iam/iam-foundation.ts c009_fix/backend/src/iam/iam-foundation.ts
+--- c009_base/backend/src/iam/iam-foundation.ts	2026-11-14 03:25:30.499682860 -0500
++++ c009_fix/backend/src/iam/iam-foundation.ts	2026-11-14 03:31:17.220501633 -0500
+@@ -27,6 +27,7 @@
+   { code: "customer.create", module: "客户", name: "创建客户", riskLevel: "normal", scopeModes: ["self", "org_unit", "tenant"] },
+   { code: "customer.update", module: "客户", name: "维护客户", riskLevel: "normal", scopeModes: ["self", "org_unit", "org_subtree", "tenant"] },
+   { code: "customer.delete", module: "客户", name: "删除客户", riskLevel: "high", scopeModes: ["self", "org_subtree", "tenant"] },
++  { code: "customer.activity.delete", module: "客户", name: "删除客户沟通记录", riskLevel: "critical", scopeModes: ["org_subtree", "tenant"] },
+   { code: "customer.assign", module: "客户", name: "分配客户", riskLevel: "sensitive", scopeModes: ["org_unit", "org_subtree", "tenant"] },
+   { code: "customer.export", module: "客户", name: "导出客户", riskLevel: "critical", scopeModes: ["self", "org_subtree", "tenant"] },
+   { code: "customer.pool.claim", module: "客户", name: "领取公池客户", riskLevel: "normal", scopeModes: ["public_pool"] },
+@@ -107,10 +108,10 @@
+ ] as const;
+ 
+ const salesPermissions = new Set([
+-  "workspace.dashboard.read", "workspace.dashboard.manage", "lead.read", "lead.create", "lead.update", "lead.delete",
++  "workspace.dashboard.read", "workspace.dashboard.manage", "lead.read", "lead.create", "lead.update",
+   "customer.read", "customer.create", "customer.update", "customer.pool.claim",
+-  "customer.pool.release", "customer.export", "supplier.read", "supplier.create", "supplier.update",
+-  "deal.read", "deal.create", "deal.update", "deal.delete",
++  "customer.pool.release", "supplier.read", "supplier.create", "supplier.update",
++  "deal.read", "deal.create", "deal.update",
+   "deal.stage.advance", "deal.quote.create", "report.read", "daily_report.read",
+   "daily_report.create", "daily_report.comment", "message.read", "message.send",
+   "reminder.read", "reminder.manage",
+@@ -122,8 +123,8 @@
+ ]);
+ 
+ const managerExtraPermissions = new Set([
+-  "lead.assign", "lead.export", "customer.assign", "customer.delete", "report.export", "supplier.delete",
+-  "deal.stage.override",
++  "lead.assign", "lead.export", "lead.delete", "customer.assign", "customer.delete", "report.export", "supplier.delete",
++  "deal.stage.override", "deal.delete", "customer.export",
+   "order.status.override",
+   "commission.manage", "document.approve", "agent.manage", "integration.manage", "integration.approval.act", "training.manage",
+   "product.manage", "approval.task.act", "approval.workflow.manage"
+diff -ru c009_base/backend/src/lead-deletion-test.ts c009_fix/backend/src/lead-deletion-test.ts
+--- c009_base/backend/src/lead-deletion-test.ts	2026-11-14 03:25:30.501082387 -0500
++++ c009_fix/backend/src/lead-deletion-test.ts	2026-11-14 03:31:32.891548806 -0500
+@@ -36,6 +36,7 @@
+ try {
+   const ownerToken = await login("shirley@goodjob.com");
+   const otherToken = await login("mia@goodjob.com");
++  const managerToken = await login("alex@goodjob.com");
+ 
+   const plainLeadId = await createLead(ownerToken, `plain-${Date.now()}`);
+   const crossOwnerDelete = await request(`/api/leads/${plainLeadId}`, {
+@@ -45,9 +46,32 @@
+   });
+   if (crossOwnerDelete.response.status !== 404) throw new Error("lead delete must preserve owner isolation");
+ 
+-  const trash = await request(`/api/leads/${plainLeadId}`, {
++  // 业务员不能删除线索（含移入垃圾箱和永久删除），只能标记无效并写明原因
++  const salesDelete = await request(`/api/leads/${plainLeadId}`, {
+     method: "DELETE",
+     headers: { authorization: `Bearer ${ownerToken}` },
++    body: JSON.stringify({ reason: "想删除" })
++  });
++  if (salesDelete.response.status !== 403) throw new Error("sales must not delete leads");
++  const invalidNoReason = await request(`/api/leads/${plainLeadId}`, {
++    method: "PATCH",
++    headers: { authorization: `Bearer ${ownerToken}` },
++    body: JSON.stringify({ status: "invalid" })
++  });
++  if (invalidNoReason.response.status !== 400) throw new Error("marking invalid must require a reason");
++  const invalidWithReason = await request(`/api/leads/${plainLeadId}`, {
++    method: "PATCH",
++    headers: { authorization: `Bearer ${ownerToken}` },
++    body: JSON.stringify({ status: "invalid", remark: "客户号码为空号，无法联系" })
++  });
++  if (!invalidWithReason.response.ok || invalidWithReason.json.lead?.status !== "invalid" || invalidWithReason.json.lead?.deletedAt) {
++    throw new Error("sales should be able to mark lead invalid with a reason");
++  }
++  if (!getStore().leads.some((item) => item.id === plainLeadId)) throw new Error("invalid lead must be kept");
++
++  const trash = await request(`/api/leads/${plainLeadId}`, {
++    method: "DELETE",
++    headers: { authorization: `Bearer ${managerToken}` },
+     body: JSON.stringify({ reason: "无效线索" })
+   });
+   if (!trash.response.ok || !trash.json.lead?.deletedAt) throw new Error("lead trash failed");
+@@ -60,13 +84,18 @@
+ 
+   await request(`/api/leads/${plainLeadId}`, {
+     method: "DELETE",
+-    headers: { authorization: `Bearer ${ownerToken}` },
++    headers: { authorization: `Bearer ${managerToken}` },
+     body: JSON.stringify({ reason: "永久清理前置" })
+   });
+-  const permanent = await request(`/api/leads/${plainLeadId}/permanent`, {
++  const salesPermanent = await request(`/api/leads/${plainLeadId}/permanent`, {
+     method: "DELETE",
+     headers: { authorization: `Bearer ${ownerToken}` }
+   });
++  if (salesPermanent.response.status !== 403) throw new Error("sales must not permanently delete leads");
++  const permanent = await request(`/api/leads/${plainLeadId}/permanent`, {
++    method: "DELETE",
++    headers: { authorization: `Bearer ${managerToken}` }
++  });
+   if (!permanent.response.ok || !permanent.json.ok) throw new Error("lead permanent delete failed");
+ 
+   const convertedLeadId = await createLead(ownerToken, `converted-${Date.now()}`);
+@@ -85,7 +114,7 @@
+ 
+   const convertedTrash = await request(`/api/leads/${convertedLeadId}`, {
+     method: "DELETE",
+-    headers: { authorization: `Bearer ${ownerToken}` },
++    headers: { authorization: `Bearer ${managerToken}` },
+     body: JSON.stringify({ reason: "转化完成后清理线索工作区" })
+   });
+   if (!convertedTrash.response.ok || !convertedTrash.json.lead?.deletedAt) {
+@@ -101,7 +130,7 @@
+ 
+   const convertedPermanent = await request(`/api/leads/${convertedLeadId}/permanent`, {
+     method: "DELETE",
+-    headers: { authorization: `Bearer ${ownerToken}` }
++    headers: { authorization: `Bearer ${managerToken}` }
+   });
+   if (convertedPermanent.response.status !== 400) {
+     throw new Error("converted lead source record must reject permanent deletion");
+diff -ru c009_base/backend/src/routes/communication.ts c009_fix/backend/src/routes/communication.ts
+--- c009_base/backend/src/routes/communication.ts	2026-11-14 03:25:30.507986536 -0500
++++ c009_fix/backend/src/routes/communication.ts	2026-11-14 03:31:17.224237149 -0500
+@@ -810,6 +810,13 @@
+       res.status(403).json({ message: "无权访问该消息" });
+       return;
+     }
++    // 风险修复：沟通记录是考核证据，默认任何人都不能物理删除；管理员设 GOODJOB_ALLOW_MESSAGE_DELETE=true 才临时开启（且仍需主管权限）
++    if (process.env.GOODJOB_ALLOW_MESSAGE_DELETE !== "true" || req.user!.role === "sales" || !hasIamPermission(req.user!, "customer.activity.delete")) {
++      console.warn(`[audit] whatsapp message delete BLOCKED id=${message.id} by=${req.user!.id}`);
++      res.status(403).json({ message: "沟通记录不可删除；如有错误，请新增更正记录或联系管理员" });
++      return;
++    }
++    console.warn(`[audit] whatsapp message deleted id=${message.id} customer=${message.customerId} by=${req.user!.id}`);
+     store.whatsappMessages = store.whatsappMessages.filter((m) => m.id !== message.id);
+     await store.persist();
+     res.json({ ok: true, id: message.id });
+diff -ru c009_base/backend/src/routes/customers.ts c009_fix/backend/src/routes/customers.ts
+--- c009_base/backend/src/routes/customers.ts	2026-11-14 03:25:30.508018385 -0500
++++ c009_fix/backend/src/routes/customers.ts	2026-11-14 03:31:17.223781586 -0500
+@@ -902,6 +902,10 @@
+   }));
+ 
+   app.post("/api/customers/bulk-delete", requireAuth, asyncRoute(async (req, res) => {
++    if (req.user!.role === "sales" || !hasIamPermission(req.user!, "customer.delete")) {
++      res.status(403).json({ message: "普通业务员不能删除客户；请联系主管处理" });
++      return;
++    }
+     const schema = z.object({ ids: z.array(z.string()).min(1).max(200) });
+     const body = schema.parse(req.body);
+     const store = getStore();
+@@ -1054,6 +1058,12 @@
+       res.status(404).json({ message: "跟进记录不存在或不属于该客户" });
+       return;
+     }
++    // 风险修复：原始沟通内容是考核证据，业务员只能改下次提醒；纠错请新增一条记录
++    if ((body.content !== undefined || body.type !== undefined) &&
++        (req.user!.role === "sales" || !hasIamPermission(req.user!, "customer.activity.delete"))) {
++      res.status(403).json({ message: "只有管理员可更正已保存的沟通内容；业务员如有错误请新增一条更正记录；如有错误请新增一条更正记录" });
++      return;
++    }
+     if (body.content !== undefined) activity.content = body.content;
+     if (body.type !== undefined) activity.type = body.type;
+     if (body.nextReminder !== undefined) {
+@@ -1077,6 +1087,11 @@
+     const store = getStore();
+     const customer = findWritableCustomer(req.user!, req.params.id, res);
+     if (!customer) return;
++    // 沟通记录是考核证据：只有管理员（customer.activity.delete）可删，业务员和主管都不行
++    if (req.user!.role === "sales" || !hasIamPermission(req.user!, "customer.activity.delete")) {
++      res.status(403).json({ message: "沟通记录不可删除；如有错误请新增更正记录，或联系管理员" });
++      return;
++    }
+     const index = store.customerActivities.findIndex(
+       (item) => item.id === req.params.activityId && item.customerId === customer.id
+     );
+diff -ru c009_base/backend/src/routes/deals.ts c009_fix/backend/src/routes/deals.ts
+--- c009_base/backend/src/routes/deals.ts	2026-11-14 03:25:30.508047986 -0500
++++ c009_fix/backend/src/routes/deals.ts	2026-11-14 03:25:30.607483965 -0500
+@@ -559,6 +559,11 @@
+       res.status(404).json({ message: "商机不存在" });
+       return;
+     }
++    // 风险修复：删除商机会级联删除事件、报价历史和待办，普通业务员不得执行
++    if (req.user!.role === "sales") {
++      res.status(403).json({ message: "普通业务员不能删除商机；如需作废，请联系主管处理" });
++      return;
++    }
+     const linkedDocuments = store.tradeDocuments.filter((document) => document.dealId === deal.id);
+     if (linkedDocuments.length) {
+       res.status(400).json({
+diff -ru c009_base/backend/src/routes/leads.ts c009_fix/backend/src/routes/leads.ts
+--- c009_base/backend/src/routes/leads.ts	2026-11-14 03:25:30.508685559 -0500
++++ c009_fix/backend/src/routes/leads.ts	2026-11-14 03:31:17.225207738 -0500
+@@ -390,6 +390,23 @@
+       res.status(404).json({ message: "线索不存在或无权访问" });
+       return;
+     }
++    // 业务员不能删线索，但可以标记“无效”：必须写明原因（备注），留下可核查的记录
++    if (body.status === "invalid" && lead.status !== "invalid") {
++      const reason = String(body.remark ?? "").trim();
++      if (reason.length < 2) {
++        res.status(400).json({ message: "标记线索无效必须在备注中写明原因" });
++        return;
++      }
++      store.leadActivities.unshift({
++        id: `la_${Date.now()}_inv`,
++        leadId: lead.id,
++        type: "note",
++        content: `标记为无效：${reason}`,
++        operatorId: req.user!.id,
++        nextFollowAt: "",
++        createdAt: new Date().toISOString()
++      });
++    }
+     const previousStage = lead.stage;
+     Object.assign(lead, body);
+     lead.lastActivityAt = "刚刚";
+@@ -417,6 +434,10 @@
+       res.status(404).json({ message: "线索不存在或无权访问" });
+       return;
+     }
++    if (req.user!.role === "sales" || !hasIamPermission(req.user!, "lead.delete")) {
++      res.status(403).json({ message: "普通业务员不能删除线索；请把线索标记为“无效”并写明原因，或联系主管处理" });
++      return;
++    }
+     if (lead.deletedAt) {
+       res.status(400).json({ message: "线索已在垃圾箱中" });
+       return;
+@@ -482,6 +503,10 @@
+       res.status(404).json({ message: "线索不存在或无权访问" });
+       return;
+     }
++    if (req.user!.role === "sales" || !hasIamPermission(req.user!, "lead.delete")) {
++      res.status(403).json({ message: "普通业务员不能永久删除线索；请联系主管处理" });
++      return;
++    }
+     if (!lead.deletedAt) {
+       res.status(400).json({ message: "只有垃圾箱中的线索可以永久删除" });
+       return;
+diff -ru c009_base/backend/src/routes/orders.ts c009_fix/backend/src/routes/orders.ts
+--- c009_base/backend/src/routes/orders.ts	2026-11-14 03:25:30.508906944 -0500
++++ c009_fix/backend/src/routes/orders.ts	2026-11-14 03:31:59.303155137 -0500
+@@ -862,6 +862,11 @@
+   }));
+ 
+   app.delete("/api/orders/:id/files/:fileId", requireAuth, asyncRoute(async (req, res) => {
++    // 风险修复：该记录属于公司业务资料，普通业务员不得删除
++    if (req.user!.role === "sales") {
++      res.status(403).json({ message: "业务员不能删除订单附件；如有错误请联系主管" });
++      return;
++    }
+     const store = getStore();
+     const order = store.orders.find((item) => item.id === req.params.id);
+     if (!order || !orderVisible(req.user!, order)) {
+diff -ru c009_base/backend/src/routes/tools.ts c009_fix/backend/src/routes/tools.ts
+--- c009_base/backend/src/routes/tools.ts	2026-11-14 03:25:30.509100693 -0500
++++ c009_fix/backend/src/routes/tools.ts	2026-11-14 03:31:59.300105773 -0500
+@@ -744,6 +744,11 @@
+   }));
+ 
+   app.delete("/api/tools/product-categories/:name", requireAuth, asyncRoute(async (req, res) => {
++    // 风险修复：该记录属于公司业务资料，普通业务员不得删除
++    if (req.user!.role === "sales") {
++      res.status(403).json({ message: "业务员不能删除产品分类；请联系主管" });
++      return;
++    }
+     const name = normalizeProductCategoryName(req.params.name);
+     if (!name) {
+       res.status(400).json({ message: "分类名称不能为空" });
+@@ -830,6 +835,11 @@
+   }));
+ 
+   app.delete("/api/tools/products/:id", requireAuth, asyncRoute(async (req, res) => {
++    // 风险修复：该记录属于公司业务资料，普通业务员不得删除
++    if (req.user!.role === "sales") {
++      res.status(403).json({ message: "业务员不能删除产品资料；如需下架请联系主管" });
++      return;
++    }
+     const store = getStore();
+     const index = store.products.findIndex((item) => item.id === req.params.id && canSeeOwner(req.user!, item.ownerId, item.teamId));
+     if (index < 0) {
+@@ -943,6 +953,11 @@
+   }));
+ 
+   app.delete("/api/tools/shipments/:id", requireAuth, asyncRoute(async (req, res) => {
++    // 风险修复：该记录属于公司业务资料，普通业务员不得删除
++    if (req.user!.role === "sales") {
++      res.status(403).json({ message: "业务员不能删除发货单；发货记录请联系主管处理" });
++      return;
++    }
+     const store = getStore();
+     const index = store.shipments.findIndex((item) => item.id === req.params.id && item.ownerId === req.user!.id);
+     if (index < 0) {
+diff -ru c009_base/backend/src/routes/trade-documents.ts c009_fix/backend/src/routes/trade-documents.ts
+--- c009_base/backend/src/routes/trade-documents.ts	2026-11-14 03:25:30.509127539 -0500
++++ c009_fix/backend/src/routes/trade-documents.ts	2026-11-14 03:31:59.302521533 -0500
+@@ -1373,6 +1373,11 @@
+   }));
+ 
+   app.delete("/api/document-assets/letterheads/:id", requireAuth, asyncRoute(async (req, res) => {
++    // 风险修复：该记录属于公司业务资料，普通业务员不得删除
++    if (req.user!.role === "sales") {
++      res.status(403).json({ message: "业务员不能删除公司信头；请联系主管" });
++      return;
++    }
+     const store = getStore();
+     const index = store.documentLetterheads.findIndex((item) => item.id === req.params.id && item.teamId === req.user!.teamId);
+     if (index < 0) {
+@@ -1420,6 +1425,11 @@
+   }));
+ 
+   app.delete("/api/document-assets/stamps/:id", requireAuth, asyncRoute(async (req, res) => {
++    // 风险修复：该记录属于公司业务资料，普通业务员不得删除
++    if (req.user!.role === "sales") {
++      res.status(403).json({ message: "业务员不能删除公司印章；请联系主管" });
++      return;
++    }
+     const store = getStore();
+     const index = store.documentStamps.findIndex((item) => item.id === req.params.id && item.teamId === req.user!.teamId);
+     if (index < 0) {
+diff -ru c009_base/backend/src/self-test.ts c009_fix/backend/src/self-test.ts
+--- c009_base/backend/src/self-test.ts	2026-11-14 03:25:30.509470773 -0500
++++ c009_fix/backend/src/self-test.ts	2026-11-14 03:25:30.608305499 -0500
+@@ -322,16 +322,28 @@
+     body: JSON.stringify({ title: `销售跟进 ${boundaryCompany}`, type: "customer", related: boundaryCompany })
+   });
+   if (!managerBoundaryTodo.response.ok || !salesBoundaryTodo.response.ok) throw new Error("boundary todo create failed");
++  // 公司规则：普通业务员不能删除客户，必须 403，且客户和待办都原样保留
+   const boundaryDelete = await request("/api/customers/bulk-delete", {
+     method: "POST",
+     headers: { authorization: `Bearer ${salesToken}` },
+     body: JSON.stringify({ ids: [boundaryCustomer.json.customer.id] })
+   });
+-  if (!boundaryDelete.response.ok) throw new Error("boundary customer delete failed");
++  if (boundaryDelete.response.status !== 403) throw new Error("sales customer delete must be forbidden");
++  const salesCustomersAfterDenied = await request("/api/customers", { headers: { authorization: `Bearer ${salesToken}` } });
++  if (!salesCustomersAfterDenied.json.customers.some((customer: { id: string }) => customer.id === boundaryCustomer.json.customer.id)) throw new Error("denied delete must keep the customer");
++  const salesTodosAfterDenied = await request("/api/todos", { headers: { authorization: `Bearer ${salesToken}` } });
++  if (!salesTodosAfterDenied.json.todos.some((todo: { id: string }) => todo.id === salesBoundaryTodo.json.todo.id)) throw new Error("denied delete must keep sales todo");
++  // 授权的主管删除：只清理主管自己的相关待办，不动业务员的待办
++  const managerBoundaryDelete = await request("/api/customers/bulk-delete", {
++    method: "POST",
++    headers: { authorization: `Bearer ${managerToken}` },
++    body: JSON.stringify({ ids: [boundaryCustomer.json.customer.id] })
++  });
++  if (!managerBoundaryDelete.response.ok) throw new Error("manager customer delete failed");
+   const managerTodosAfterBoundaryDelete = await request("/api/todos", { headers: { authorization: `Bearer ${managerToken}` } });
+   const salesTodosAfterBoundaryDelete = await request("/api/todos", { headers: { authorization: `Bearer ${salesToken}` } });
+-  if (!managerTodosAfterBoundaryDelete.json.todos.some((todo: { id: string }) => todo.id === managerBoundaryTodo.json.todo.id)) throw new Error("customer delete must not remove manager personal todo");
+-  if (salesTodosAfterBoundaryDelete.json.todos.some((todo: { id: string }) => todo.id === salesBoundaryTodo.json.todo.id)) throw new Error("customer delete should remove current user's related todo");
++  if (managerTodosAfterBoundaryDelete.json.todos.some((todo: { id: string }) => todo.id === managerBoundaryTodo.json.todo.id)) throw new Error("manager delete should remove manager's own related todo");
++  if (!salesTodosAfterBoundaryDelete.json.todos.some((todo: { id: string }) => todo.id === salesBoundaryTodo.json.todo.id)) throw new Error("manager delete must not remove another employee's todo");
+ 
+   const invalidOcrImage = await request("/api/tools/ocr/jobs/current/image", {
+     method: "POST",
+@@ -2830,10 +2842,15 @@
+     })
+   });
+   if (!customerImport.response.ok || customerImport.json.result.created !== 1 || customerImport.json.result.updated !== 1) throw new Error("customer import failed");
+-  const customerExport = await request("/api/import-export/customers/export", {
++  const salesExportDenied = await request("/api/import-export/customers/export", {
+     method: "POST",
+     headers: { authorization: `Bearer ${salesToken}` }
+   });
++  if (salesExportDenied.response.status !== 403) throw new Error("sales must not export customers");
++  const customerExport = await request("/api/import-export/customers/export", {
++    method: "POST",
++    headers: { authorization: `Bearer ${managerToken}` }
++  });
+   if (!customerExport.response.ok || !Array.isArray(customerExport.json.customers) || customerExport.json.customers.length < 1) throw new Error("customer export failed");
+   if (!customerExport.json.customers.some((customer: { whatsapp?: string }) => customer.whatsapp === "+4915212345678")) throw new Error("customer WhatsApp import/export failed");
+   if (!customerExport.json.customers.some((customer: { whatsapp?: string; lifecycleStatus?: string; hasWonDeal?: boolean; wonDealCount?: number }) => customer.whatsapp === "+4915212345678" && customer.lifecycleStatus === "won" && customer.hasWonDeal === true && customer.wonDealCount === 0)) throw new Error("imported won customer must not depend on a deal");
+diff -ru c009_base/whatsapp-plugin/src/server/app.ts c009_fix/whatsapp-plugin/src/server/app.ts
+--- c009_base/whatsapp-plugin/src/server/app.ts	2026-11-14 03:25:30.520687239 -0500
++++ c009_fix/whatsapp-plugin/src/server/app.ts	2026-11-14 03:25:30.609428479 -0500
+@@ -962,6 +962,11 @@
+   app.delete(
+     "/api/v1/accounts/:id",
+     asyncRoute(async (request, response) => {
++      // 风险修复：删除账号会级联删除该账号下全部会话和消息，默认禁止
++      if (process.env.PLUGIN_ALLOW_ACCOUNT_DELETE !== "true") {
++        response.status(403).json({ error: "Account deletion is disabled because it permanently erases all chat history" });
++        return;
++      }
+       const account = await ownedAccount(request, routeParam(request.params.id));
+       const routingReferences = await repository.countRoutingReferences(account.id);
+       if (routingReferences > 0) {
