@@ -61,8 +61,10 @@ function isIso(value: unknown) {
 
 try {
   const store = getStore();
-  const manager = store.users.find((item) => item.email === "alex@goodjob.com")!;
-  const management = await login("alex@goodjob.com");
+  const manager = store.users.find((item) => item.email === "admin@goodjob.com")!;
+  // 沟通记录的更正/撤销只有管理员可做（主管、业务员都不行）
+  const management = await login("admin@goodjob.com");
+  const managerToken = await login("alex@goodjob.com");
   const salesToken = await login("shirley@goodjob.com");
 
   // 种子数据：c1/c2 属 shirley(europe)，c3 属 mia(europe)；ca1→c1, ca2→c2, ca3→c3
@@ -213,7 +215,15 @@ try {
   );
 
   const removeForbidden = await request("/api/customers/c3/activities/ca3", salesToken, { method: "DELETE" });
-  check("sales 撤销他人名下客户的跟进 → 404", removeForbidden.response.status === 404, removeForbidden.response.status);
+  check("sales 撤销他人名下客户的跟进 → 403 或 404", [403, 404].includes(removeForbidden.response.status), removeForbidden.response.status);
+  const managerDelete = await request("/api/customers/c1/activities/ca1", managerToken, { method: "DELETE" });
+  check("主管撤销沟通记录 → 403（只有管理员可以）", managerDelete.response.status === 403, managerDelete.response.status);
+  const managerEdit = await request("/api/customers/c1/activities/ca1", managerToken, { method: "PATCH", body: JSON.stringify({ content: "主管改写" }) });
+  check("主管改写沟通正文 → 403", managerEdit.response.status === 403, managerEdit.response.status);
+  const salesEdit = await request("/api/customers/c1/activities/ca1", salesToken, { method: "PATCH", body: JSON.stringify({ content: "业务员改写" }) });
+  check("业务员改写沟通正文 → 403", salesEdit.response.status === 403, salesEdit.response.status);
+  const salesReminder = await request("/api/customers/c1/activities/ca1", salesToken, { method: "PATCH", body: JSON.stringify({ nextReminder: "下周一" }) });
+  check("业务员只改下次提醒 → 200", salesReminder.response.status === 200, salesReminder.response.status);
   check(
     "越权撤销未误删目标记录",
     getStore().customerActivities.some((item) => item.id === "ca3")

@@ -559,6 +559,11 @@ export function registerDealsRoutes(app: Express) {
       res.status(404).json({ message: "商机不存在" });
       return;
     }
+    // 风险修复：删除商机会级联删除事件、报价历史和待办，普通业务员不得执行
+    if (req.user!.role === "sales") {
+      res.status(403).json({ message: "普通业务员不能删除商机；如需作废，请联系主管处理" });
+      return;
+    }
     const linkedDocuments = store.tradeDocuments.filter((document) => document.dealId === deal.id);
     if (linkedDocuments.length) {
       res.status(400).json({
