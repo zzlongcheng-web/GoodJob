@@ -2,7 +2,7 @@ name: GoodJob manager dashboard full verification
 
 on:
   push:
-    branches: [feature/owner-dashboard-v1]
+    branches: [feature/owner-dashboard-v1, feature/golden-gain-hardening-20261114]
   workflow_dispatch:
 
 permissions:
