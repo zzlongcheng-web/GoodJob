@@ -27,6 +27,7 @@ export const IAM_PERMISSION_CATALOG: IamPermissionDefinition[] = [
   { code: "customer.create", module: "客户", name: "创建客户", riskLevel: "normal", scopeModes: ["self", "org_unit", "tenant"] },
   { code: "customer.update", module: "客户", name: "维护客户", riskLevel: "normal", scopeModes: ["self", "org_unit", "org_subtree", "tenant"] },
   { code: "customer.delete", module: "客户", name: "删除客户", riskLevel: "high", scopeModes: ["self", "org_subtree", "tenant"] },
+  { code: "customer.activity.delete", module: "客户", name: "删除客户沟通记录", riskLevel: "critical", scopeModes: ["org_subtree", "tenant"] },
   { code: "customer.assign", module: "客户", name: "分配客户", riskLevel: "sensitive", scopeModes: ["org_unit", "org_subtree", "tenant"] },
   { code: "customer.export", module: "客户", name: "导出客户", riskLevel: "critical", scopeModes: ["self", "org_subtree", "tenant"] },
   { code: "customer.pool.claim", module: "客户", name: "领取公池客户", riskLevel: "normal", scopeModes: ["public_pool"] },
@@ -107,8 +108,8 @@ export const PLATFORM_PERMISSION_CODES = [
 ] as const;
 
 const salesPermissions = new Set([
-  "workspace.dashboard.read", "workspace.dashboard.manage", "lead.read", "lead.create", "lead.update", "lead.delete",
-  "customer.read", "customer.create", "customer.update", "customer.delete", "customer.pool.claim",
+  "workspace.dashboard.read", "workspace.dashboard.manage", "lead.read", "lead.create", "lead.update",
+  "customer.read", "customer.create", "customer.update", "customer.pool.claim",
   "customer.pool.release", "customer.export", "supplier.read", "supplier.create", "supplier.update",
   "deal.read", "deal.create", "deal.update", "deal.delete",
   "deal.stage.advance", "deal.quote.create", "report.read", "daily_report.read",
@@ -122,7 +123,7 @@ const salesPermissions = new Set([
 ]);
 
 const managerExtraPermissions = new Set([
-  "lead.assign", "lead.export", "customer.assign", "report.export", "supplier.delete",
+  "lead.assign", "lead.export", "lead.delete", "customer.assign", "customer.delete", "customer.activity.delete", "report.export", "supplier.delete",
   "deal.stage.override",
   "order.status.override",
   "commission.manage", "document.approve", "agent.manage", "integration.manage", "integration.approval.act", "training.manage",
