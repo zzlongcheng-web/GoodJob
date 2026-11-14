@@ -411,6 +411,12 @@ function iamBusinessPermission(req: Request) {
 }
 
 export async function enforceIamTenantPermission(req: Request, res: Response, next: NextFunction, permissionCode: string) {
+  // Ordinary sales staff must never delete customers or customer activity records,
+  // including when a custom IAM permission accidentally grants customer.delete.
+  if (permissionCode === "customer.delete" && req.user?.role === "sales") {
+    res.status(403).json({ message: "普通员工无权删除客户或沟通记录", permissionCode });
+    return;
+  }
   if (isPlatformIdentity(req.user)) {
     res.status(403).json({ message: "平台运维身份不能直接访问公司业务数据，请使用租户支持流程", permissionCode });
     return;
