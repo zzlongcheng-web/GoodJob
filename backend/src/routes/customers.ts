@@ -902,6 +902,10 @@ export function registerCustomersRoutes(app: Express) {
   }));
 
   app.post("/api/customers/bulk-delete", requireAuth, asyncRoute(async (req, res) => {
+    if (req.user!.role === "sales" || !hasIamPermission(req.user!, "customer.delete")) {
+      res.status(403).json({ message: "普通业务员不能删除客户；请联系主管处理" });
+      return;
+    }
     const schema = z.object({ ids: z.array(z.string()).min(1).max(200) });
     const body = schema.parse(req.body);
     const store = getStore();
