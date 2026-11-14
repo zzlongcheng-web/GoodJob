@@ -29,8 +29,10 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - name: Install dependencies
-        run: npm ci
+      - name: Install dependencies (root workspaces and standalone WhatsApp plugin)
+        run: |
+          npm ci
+          npm --prefix whatsapp-plugin ci
       - name: Compile all workspaces and WhatsApp plugin
         run: npm run build
       - name: Run project self-tests
@@ -65,8 +67,10 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - name: Install dependencies
-        run: npm ci
+      - name: Install dependencies (root workspaces and standalone WhatsApp plugin)
+        run: |
+          npm ci
+          npm --prefix whatsapp-plugin ci
       - name: Configure isolated ephemeral MySQL test account
         run: |
           mysql --protocol=tcp --host=127.0.0.1 --port=3306 --user=root --password=ci_root_password_only <<'SQL'
