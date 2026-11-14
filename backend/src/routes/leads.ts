@@ -454,10 +454,6 @@ export function registerLeadsRoutes(app: Express) {
       res.status(404).json({ message: "线索不存在或无权访问" });
       return;
     }
-    if (req.user!.role === "sales" || !hasIamPermission(req.user!, "lead.delete")) {
-      res.status(403).json({ message: "普通业务员不能永久删除线索；请联系主管处理" });
-      return;
-    }
     if (!lead.deletedAt) {
       res.status(400).json({ message: "线索不在垃圾箱中" });
       return;
@@ -488,6 +484,10 @@ export function registerLeadsRoutes(app: Express) {
     const lead = store.leads.find((item) => item.id === req.params.id);
     if (!lead || !canSeeOwner(req.user!, lead.ownerId, lead.teamId)) {
       res.status(404).json({ message: "线索不存在或无权访问" });
+      return;
+    }
+    if (req.user!.role === "sales" || !hasIamPermission(req.user!, "lead.delete")) {
+      res.status(403).json({ message: "普通业务员不能永久删除线索；请联系主管处理" });
       return;
     }
     if (!lead.deletedAt) {
