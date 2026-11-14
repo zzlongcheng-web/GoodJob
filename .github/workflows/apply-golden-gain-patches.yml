@@ -49,44 +49,9 @@ jobs:
           npm audit --audit-level=critical || true
           echo "NPM_AUDIT_WHATSAPP_AFTER"
           npm --prefix whatsapp-plugin audit --audit-level=critical || true
-      - name: Generate Golden Gain six-job CI with a strict critical security gate
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          path = Path('.github/workflows/ci-owner-dashboard.yml')
-          text = path.read_text()
-          text = text.replace('name: GoodJob manager dashboard full verification', 'name: Golden Gain CRM full verification')
-          text = text.replace('branches: [feature/owner-dashboard-v1]', 'branches: [feature/golden-gain-hardening-20261114]')
-          assert 'branches: [feature/golden-gain-hardening-20261114]' in text
-          text += """
-            dependency-security:
-              name: Critical dependency audit (root and WhatsApp)
-              runs-on: ubuntu-latest
-              timeout-minutes: 15
-              steps:
-                - uses: actions/checkout@v5
-                  with:
-                    persist-credentials: false
-                - uses: actions/setup-node@v5
-                  with:
-                    node-version: '22'
-                    cache: npm
-                - name: Install locked dependencies
-                  run: |
-                    npm ci
-                    npm --prefix whatsapp-plugin ci
-                - name: Audit root dependencies including dev
-                  run: npm audit --audit-level=critical
-                - name: Audit standalone WhatsApp plugin including dev
-                  run: npm --prefix whatsapp-plugin audit --audit-level=critical
-          """
-          Path('.github/workflows/ci-golden-gain.yml').write_text(text)
-          PY
-      - name: Remove temporary patch payload and self-modifying workflow
+      - name: Remove temporary patch payload only
         run: |
           rm -rf .patch-staging
-          rm .github/workflows/apply-golden-gain-patches.yml
           git diff --check
           if find . -name '*.rej' -o -name '*.orig' | grep -q .; then
             echo 'Unexpected patch reject or backup file'; exit 1
@@ -96,6 +61,6 @@ jobs:
         run: |
           set -Eeuo pipefail
           test "$(git branch --show-current)" = "feature/golden-gain-hardening-20261114"
-          git add -A
+          git add -A -- . ':(exclude).github/workflows/**'
           git -c user.name="Golden Gain CI" -c user.email="actions@users.noreply.github.com" commit -m "feat: Golden Gain branding, remove bootstrap scripts, resolve npm dependency advisories"
           git push origin HEAD:feature/golden-gain-hardening-20261114
