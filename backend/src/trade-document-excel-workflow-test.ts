@@ -54,7 +54,7 @@ function testDocument(id: string, ownerId: string, teamId: string, status: Trade
     buyer: "Northstar Test Buyer",
     buyerAddress: "10 Harbor Road, London",
     buyerContact: "Ava / ava@example.test",
-    seller: "GoodJob Test Seller",
+    seller: "Golden Gain Test Seller",
     sellerAddress: "Shanghai, China",
     currency: "USD",
     incoterm: "FOB",
@@ -170,7 +170,7 @@ function testVariableTemplatePackage(buffer: Buffer) {
   for (const value of [
     "PI-variable-template",
     "Northstar Test Buyer",
-    "GoodJob Export Limited",
+    "Golden Gain Export Limited",
     "Verification Light",
     "Control Enclosure",
     "Precision Bracket",
@@ -307,7 +307,7 @@ try {
 
   const letterheadResponse = await request("/api/document-assets/letterheads", admin, {
     method: "POST",
-    body: JSON.stringify({ name: "Export HQ", companyName: "GoodJob Export Limited", address: "88 Harbour Road, Hong Kong", bankInfo: "GOODJOB TEST BANK", logoUrl, logoPlacement: { horizontal: "right", vertical: "bottom", offsetX: -12, offsetY: -8, scale: 125 }, isDefault: true, enabled: true })
+    body: JSON.stringify({ name: "Export HQ", companyName: "Golden Gain Export Limited", address: "88 Harbour Road, Hong Kong", bankInfo: "GOODJOB TEST BANK", logoUrl, logoPlacement: { horizontal: "right", vertical: "bottom", offsetX: -12, offsetY: -8, scale: 125 }, isDefault: true, enabled: true })
   });
   assert.equal(letterheadResponse.status, 200);
   const letterhead = (await letterheadResponse.json()).asset;
@@ -383,7 +383,7 @@ try {
   });
   assert.equal(selectedOptions.status, 200, "valid Excel options must save");
   const selectedDocument = (await selectedOptions.json()).document as TradeDocument;
-  assert.equal(selectedDocument.seller, "GoodJob Test Seller", "selecting a letterhead must not overwrite document business data");
+  assert.equal(selectedDocument.seller, "Golden Gain Test Seller", "selecting a letterhead must not overwrite document business data");
   assert.equal(selectedDocument.letterheadSnapshot?.bankInfo, "GOODJOB TEST BANK");
   assert.deepEqual(selectedDocument.letterheadSnapshot?.logoPlacement, letterhead.logoPlacement);
   assert.equal(selectedDocument.stampSnapshot?.imageUrl, stampUrl);
@@ -435,9 +435,9 @@ try {
   assert.equal(directBytes.subarray(0, 2).toString(), "PK", "download must be a valid XLSX package");
   const directFiles = unzipSync(new Uint8Array(directBytes));
   const directPackage = packageText(directFiles);
-  assert.match(directPackage, /GoodJobLetterheadLogo/u, "an export without a configured logo must use the GoodJob default logo");
+  assert.match(directPackage, /GoodJobLetterheadLogo/u, "an export without a configured logo must use the Golden Gain default logo");
   assert.doesNotMatch(directPackage, /ProtoTech|Spreadsheet123|huawei|VNN\.R9/iu, "default export metadata and XML must be brand-safe");
-  assert.match(strFromU8(directFiles["docProps/core.xml"]), /GoodJob CRM/u, "export metadata must identify GoodJob CRM");
+  assert.match(strFromU8(directFiles["docProps/core.xml"]), /Golden Gain CRM/u, "export metadata must identify Golden Gain CRM");
 
   const snapshotExport = await request(`/api/trade-documents/${snapshotImageDocument.id}/export-xlsx`, admin, {
     method: "POST",

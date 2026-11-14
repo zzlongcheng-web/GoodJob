@@ -11,7 +11,7 @@ import { OfficialApiConnectorDriver } from "./official-api-connector-driver.js";
 const tools: Tool[] = [
   {
     name: "storage.list_files", title: "查询贸易单据",
-    description: "分页查询由 GoodJob CRM 归档到 Google Drive 的文件，不读取无关个人文件。",
+    description: "分页查询由 Golden Gain CRM 归档到 Google Drive 的文件，不读取无关个人文件。",
     inputSchema: { type: "object", additionalProperties: false, properties: {
       query: { type: "string", maxLength: 120 }, crmObjectType: { type: "string", enum: ["lead", "customer", "opportunity", "document", "shipment"] },
       crmObjectId: { type: "string", maxLength: 100 }, pageSize: { type: "integer", minimum: 1, maximum: 100 }, pageToken: { type: "string", maxLength: 1000 }
@@ -131,7 +131,7 @@ export class GoogleDriveConnectorDriver extends OfficialApiConnectorDriver {
     headers.set("authorization", `Bearer ${context.accessToken}`);
     headers.set("accept", "application/json");
     headers.set("x-goog-api-client", "goodjob-crm/1.0");
-    if (context.requestId) headers.set("x-goog-request-reason", `GoodJob request ${context.requestId.slice(0, 120)}`);
+    if (context.requestId) headers.set("x-goog-request-reason", `Golden Gain request ${context.requestId.slice(0, 120)}`);
     if (init.body && !headers.has("content-type")) headers.set("content-type", "application/json");
     const response = await createValidatedFetch(this.policy(context))(url, { ...init, headers, signal: AbortSignal.timeout(context.timeoutMs) });
     const bytes = Buffer.from(await response.arrayBuffer());

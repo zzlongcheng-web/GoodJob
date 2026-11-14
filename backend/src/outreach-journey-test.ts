@@ -65,7 +65,7 @@ function makeSendTouchpoint(overrides: Partial<ProspectTouchpoint> = {}): Prospe
     direction: "outbound",
     contactValue: "info@tanaka-scale-vietnam.com",
     subject: "Potential cooperation",
-    content: "Hello from GoodJob",
+    content: "Hello from Golden Gain",
     requestId: `req_${Math.random().toString(36).slice(2, 8)}`,
     occurredAt: at,
     createdAt: at,

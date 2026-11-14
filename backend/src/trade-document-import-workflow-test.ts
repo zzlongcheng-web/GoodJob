@@ -43,7 +43,7 @@ function importWorkbook() {
   const sheet = XLSX.utils.aoa_to_sheet([
     ["PROFORMA INVOICE"],
     ["Invoice No", "PI-IMPORT-001", "Invoice Date", "August 13, 2026"],
-    ["Seller", "GoodJob Export Limited", "Buyer", "Northstar Distribution LLC"],
+    ["Seller", "Golden Gain Export Limited", "Buyer", "Northstar Distribution LLC"],
     ["Seller Address", "88 Harbour Road, Hong Kong", "Buyer Address", "10 Market Street, Seattle, USA"],
     ["Buyer Contact", "Ava / ava@northstar.example", "Currency", "USD"],
     ["Incoterm", "FOB", "Payment Term", "30% deposit, 70% before shipment"],
@@ -177,7 +177,7 @@ try {
   assert.equal(analyzedBody.duplicate, false);
   assert.equal(analysis.detectedType, "PI");
   assert.equal(analysis.extractedDocument.number, "PI-IMPORT-001");
-  assert.equal(analysis.extractedDocument.seller, "GoodJob Export Limited");
+  assert.equal(analysis.extractedDocument.seller, "Golden Gain Export Limited");
   assert.equal(analysis.extractedDocument.buyer, "Northstar Distribution LLC");
   assert.equal(analysis.extractedDocument.items.length, 2);
   assert.equal(analysis.extractedDocument.items[0]?.hsCode, "940542");
@@ -187,7 +187,7 @@ try {
   assert.equal(analysis.declaredTotal, 370);
   assert.ok(analysis.confidence > 0.8);
 
-  const csv = Buffer.from("PROFORMA INVOICE,,,,,,,\nInvoice No,PI-CSV-001,Invoice Date,2026-08-13,,,,,\nSeller,GoodJob Export Limited,Buyer,Northstar Distribution LLC,,,,,\nDescription,Model,HS Code,Quantity,Unit,Unit Price,Amount,Country of Origin\nLED Flood Light,FL-200,940542,10,PCS,25,250,China\nGrand Total,250,,,,,,\n");
+  const csv = Buffer.from("PROFORMA INVOICE,,,,,,,\nInvoice No,PI-CSV-001,Invoice Date,2026-08-13,,,,,\nSeller,Golden Gain Export Limited,Buyer,Northstar Distribution LLC,,,,,\nDescription,Model,HS Code,Quantity,Unit,Unit Price,Amount,Country of Origin\nLED Flood Light,FL-200,940542,10,PCS,25,250,China\nGrand Total,250,,,,,,\n");
   const csvResponse = await request("/api/trade-document-imports/analyze", otherTeam, {
     method: "POST",
     headers: { "content-type": "application/octet-stream", "x-file-name": encodeURIComponent("sample.csv"), "x-file-type": "text/csv" },

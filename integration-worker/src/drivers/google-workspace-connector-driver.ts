@@ -434,7 +434,7 @@ export class GoogleWorkspaceConnectorDriver extends OfficialApiConnectorDriver {
     headers.set("authorization", `Bearer ${context.accessToken}`);
     headers.set("accept", "application/json");
     headers.set("x-goog-api-client", "goodjob-crm/1.0");
-    if (context.requestId) headers.set("x-goog-request-reason", `GoodJob request ${context.requestId.slice(0, 120)}`);
+    if (context.requestId) headers.set("x-goog-request-reason", `Golden Gain request ${context.requestId.slice(0, 120)}`);
     if (init.body && !headers.has("content-type")) headers.set("content-type", "application/json");
     const response = await createValidatedFetch(this.policy(context))(url, {
       ...init,

@@ -42,6 +42,6 @@ export async function assertBinlogDisabled(
   if (!status.logBin) return status;
   const message = `MySQL binlog 处于开启状态（log_bin=ON，MySQL ${status.version}），本项目要求关闭。${BINLOG_DISABLED_HINT}`;
   if (env.NODE_ENV === "production") throw new Error(message);
-  warn(`[GoodJob][警告] ${message}`);
+  warn(`[Golden Gain][警告] ${message}`);
   return status;
 }

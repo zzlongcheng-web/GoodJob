@@ -50,7 +50,7 @@ const compose = readFileSync(new URL("../../deploy/docker-compose/compose.yml", 
 const mysqlService = compose.slice(compose.indexOf("  mysql:"), compose.indexOf("\n  postgres:"));
 assert.match(mysqlService, /^\s+- --disable-log-bin\s*$/mu, "compose.yml 的 mysql 服务必须带 --disable-log-bin");
 assert.doesNotMatch(compose, /--log-bin(?!-)|log_bin\s*=\s*(1|ON)/iu, "compose.yml 不允许开启 binlog");
-const windowsStart = readFileSync(new URL("../../scripts/windows/Start-GoodJob.ps1", import.meta.url), "utf8");
+const windowsStart = readFileSync(new URL("../../scripts/windows/Start-Golden Gain.ps1", import.meta.url), "utf8");
 assert.match(windowsStart, /^skip-log-bin$/mu, "Windows 便携版 MariaDB 配置必须带 skip-log-bin");
 const installScript = readFileSync(new URL("../../deploy/docker-compose/install.sh", import.meta.url), "utf8");
 assert.match(installScript, /^assert_mysql_binlog_disabled$/mu, "安装/升级脚本必须验收 binlog 已关闭");
