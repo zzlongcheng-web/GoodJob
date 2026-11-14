@@ -27,6 +27,7 @@ assert.ok(seed, "Expected existing seed lead for test");
 const newLead = { ...seed, id: marker, company: "Manager KPI Regression Ltd", status: "following" as const,
   createdAt: "2026-11-14T14:00:00.000Z", convertedCustomerId: "", convertedDealId: "" };
 store.leads.push(newLead);
+store.leads.push({ ...newLead, id: marker + '_second_import' });
 store.leadActivities.push({ id: marker + "_activity", leadId: marker, type: "note", operatorId: sales.id,
   content: "客户询价和交期讨论，待主管审核有效性", nextFollowAt: "", createdAt: "2026-11-14T14:10:00.000Z" });
 try {
@@ -34,10 +35,13 @@ try {
   const row = report?.rows.find((item) => item.ownerId === sales.id);
   assert.ok(row, "manager should see team member");
   assert.ok(row.newLeads >= 1 && row.communicationCandidates >= 1, "new lead and activity must appear");
+  const oldRow = original?.rows.find((item) => item.ownerId === sales.id);
+  assert.equal(row.newLeads, (oldRow?.newLeads || 0) + 1, "multiple imports of one company must count once");
   assert.ok(row.verifiedWhatsAppReplies <= row.communicationCandidates, "notes alone cannot count as verified replies");
   assert.equal(row.target, 61);
 } finally {
   store.leads.splice(store.leads.findIndex((lead) => lead.id === marker), 1);
+  store.leads.splice(store.leads.findIndex((lead) => lead.id === marker + "_second_import"), 1);
   store.leadActivities.splice(store.leadActivities.findIndex((activity) => activity.id === marker + "_activity"), 1);
 }
 
