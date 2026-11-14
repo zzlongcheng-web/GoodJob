@@ -331,7 +331,7 @@ export class ProspectWorkerService {
       await coordinator.start();
       this.coordinator = coordinator;
       console.log(
-        "GoodJob CRM prospect queue coordination enabled with BullMQ"
+        "Golden Gain CRM prospect queue coordination enabled with BullMQ"
       );
     } catch (error) {
       if (this.queueRequired) {
@@ -340,7 +340,7 @@ export class ProspectWorkerService {
         throw error;
       }
       console.warn(
-        "GoodJob CRM Redis/BullMQ unavailable, "
+        "Golden Gain CRM Redis/BullMQ unavailable, "
         + "prospect worker continues with MySQL polling"
       );
     }

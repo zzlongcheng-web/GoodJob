@@ -340,7 +340,7 @@ try {
       title: "Security state test",
       number: `PI-SEC-${Date.now()}`,
       issueDate: "2026-07-12",
-      seller: "GoodJob",
+      seller: "Golden Gain",
       currency: "USD",
       incoterm: "FOB",
       status: "approved",
@@ -434,7 +434,7 @@ try {
     headers: { authorization: `Bearer ${admin.json.token}` }
   });
   const docsInitScript = await docsInit.text();
-  if (!docsUi.ok || !docsHtml.includes("GoodJob CRM API 调试")
+  if (!docsUi.ok || !docsHtml.includes("Golden Gain CRM API 调试")
     || !docsInit.ok || !docsInitScript.includes("X-CSRF-Token")) {
     throw new Error("Swagger UI or automatic CSRF interceptor missing");
   }

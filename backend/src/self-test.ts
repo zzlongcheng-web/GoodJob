@@ -596,7 +596,7 @@ try {
     headers: { authorization: `Bearer ${salesToken}` },
     body: JSON.stringify({
       to: "lead.buyer@example.com",
-      subject: "GoodJob 产品资料与报价沟通",
+      subject: "Golden Gain 产品资料与报价沟通",
       body: "Dear Lead Buyer, we would like to confirm your specification and prepare a quotation.",
       nextFollowAt: "后天 10:00"
     })
@@ -2883,7 +2883,7 @@ try {
       title: "X".repeat(256),
       number: "PI-LENGTH-CHECK",
       issueDate: "2026-07-24",
-      seller: "GoodJob Trading Test Co., Ltd.",
+      seller: "Golden Gain Trading Test Co., Ltd.",
       items: [{ product: "Length validation", quantity: 1, unitPrice: 1 }]
     })
   });
@@ -2902,7 +2902,7 @@ try {
       buyer: "Automation Buyer Ltd.",
       buyerAddress: "Berlin, Germany",
       buyerContact: "Auto Buyer",
-      seller: "GoodJob Trading Test Co., Ltd.",
+      seller: "Golden Gain Trading Test Co., Ltd.",
       sellerAddress: "Shanghai, China",
       currency: "USD",
       incoterm: "FOB",

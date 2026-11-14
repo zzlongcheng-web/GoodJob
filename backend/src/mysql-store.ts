@@ -162,7 +162,7 @@ async function acquireProductionInstanceLock(
   if (Number(result?.acquired || 0) !== 1) {
     connection.release();
     throw new Error(
-      `同一数据库已有 GoodJob CRM ${processRole} 实例运行，拒绝重复启动`
+      `同一数据库已有 Golden Gain CRM ${processRole} 实例运行，拒绝重复启动`
     );
   }
   const timer = setInterval(async () => {
@@ -172,7 +172,7 @@ async function acquireProductionInstanceLock(
       // IS_USED_LOCK 查询去问 MySQL「锁还在不在」。
       await connection.ping();
     } catch {
-      console.error("GoodJob CRM 单实例数据库锁连接已断开，进程即将退出");
+      console.error("Golden Gain CRM 单实例数据库锁连接已断开，进程即将退出");
       process.exit(1);
     }
   }, 30000);
@@ -613,7 +613,7 @@ export async function createMysqlStore(
   const profile = assertDatabaseProfile(process.env, databaseUrl);
   const processRole = options.processRole || "api";
   const pool = mysql.createPool({ uri: databaseUrl, connectionLimit: 4, namedPlaceholders: true });
-  console.log(`GoodJob CRM database profile: ${profile.profile} (${profile.database})`);
+  console.log(`Golden Gain CRM database profile: ${profile.profile} (${profile.database})`);
   // 本项目要求 MySQL 关闭 binlog：生产环境发现开启直接拒绝启动，其他环境只警告
   try {
     await assertBinlogDisabled(pool);
