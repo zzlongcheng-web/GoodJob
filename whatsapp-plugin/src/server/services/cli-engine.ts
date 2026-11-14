@@ -719,6 +719,8 @@ export class CliEngine {
   /** 起一个常驻进程。参数与 `runCold` 完全一致，只多一个流式输入。 */
   private async spawnWarm(model: string, effort: string): Promise<WarmWorker> {
     const workspace = await this.ensureWorkspace();
+    // Workspace initialization is asynchronous; dispose may have happened in the meantime.
+    if (this.disposed) throw new Error("CLI warm-up cancelled: engine disposed");
     const args = [
       "--print",
       "--input-format", "stream-json",
