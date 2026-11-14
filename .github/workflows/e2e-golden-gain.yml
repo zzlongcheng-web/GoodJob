@@ -1,0 +1,31 @@
+name: Golden Gain browser end-to-end regression
+on:
+  push:
+    branches: [feature/golden-gain-hardening-20261114]
+    paths: [.github/workflows/e2e-golden-gain.yml]
+permissions:
+  contents: read
+jobs:
+  browser-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CI: 'true'
+      JWT_SECRET: golden-gain-e2e-test-secret-at-least-32-characters
+      NODE_ENV: e2e
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify browser installation
+        run: |
+          if command -v google-chrome; then google-chrome --version
+          elif command -v google-chrome-stable; then google-chrome-stable --version
+          else npx playwright install --with-deps chrome
+          fi
+      - name: Run complete Playwright Chromium web UI tests
+        run: npm run test:e2e --workspace frontend
