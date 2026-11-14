@@ -30,6 +30,8 @@ jobs:
         shell: bash
         run: |
           echo 'ef405f4143d98e81876056dfe4742fed1fd818553808e7f8c2697475094b18b9  .ci-v4-input/goodjob-c009-fixes-v4.patch' | sha256sum -c -
+          # Original uploaded text has no final newline. Repair only the runner copy.
+          printf '\n' >> .ci-v4-input/goodjob-c009-fixes-v4.patch
           patch --batch --fuzz=0 -p1 --dry-run < .ci-v4-input/goodjob-c009-fixes-v4.patch
           patch --batch --fuzz=0 -p1 < .ci-v4-input/goodjob-c009-fixes-v4.patch
           git diff --stat
@@ -56,6 +58,8 @@ jobs:
         shell: bash
         run: |
           echo 'ef405f4143d98e81876056dfe4742fed1fd818553808e7f8c2697475094b18b9  .ci-v4-input/goodjob-c009-fixes-v4.patch' | sha256sum -c -
+          # Original uploaded text has no final newline. Repair only the runner copy.
+          printf '\n' >> .ci-v4-input/goodjob-c009-fixes-v4.patch
           patch --batch --fuzz=0 -p1 --dry-run < .ci-v4-input/goodjob-c009-fixes-v4.patch
           patch --batch --fuzz=0 -p1 < .ci-v4-input/goodjob-c009-fixes-v4.patch
           git diff --stat
@@ -98,6 +102,8 @@ jobs:
         shell: bash
         run: |
           echo 'ef405f4143d98e81876056dfe4742fed1fd818553808e7f8c2697475094b18b9  .ci-v4-input/goodjob-c009-fixes-v4.patch' | sha256sum -c -
+          # Original uploaded text has no final newline. Repair only the runner copy.
+          printf '\n' >> .ci-v4-input/goodjob-c009-fixes-v4.patch
           patch --batch --fuzz=0 -p1 --dry-run < .ci-v4-input/goodjob-c009-fixes-v4.patch
           patch --batch --fuzz=0 -p1 < .ci-v4-input/goodjob-c009-fixes-v4.patch
           git diff --stat
@@ -142,6 +148,8 @@ jobs:
         shell: bash
         run: |
           echo 'ef405f4143d98e81876056dfe4742fed1fd818553808e7f8c2697475094b18b9  .ci-v4-input/goodjob-c009-fixes-v4.patch' | sha256sum -c -
+          # Original uploaded text has no final newline. Repair only the runner copy.
+          printf '\n' >> .ci-v4-input/goodjob-c009-fixes-v4.patch
           patch --batch --fuzz=0 -p1 --dry-run < .ci-v4-input/goodjob-c009-fixes-v4.patch
           patch --batch --fuzz=0 -p1 < .ci-v4-input/goodjob-c009-fixes-v4.patch
           git diff --stat
@@ -185,6 +193,8 @@ jobs:
         shell: bash
         run: |
           echo 'ef405f4143d98e81876056dfe4742fed1fd818553808e7f8c2697475094b18b9  .ci-v4-input/goodjob-c009-fixes-v4.patch' | sha256sum -c -
+          # Original uploaded text has no final newline. Repair only the runner copy.
+          printf '\n' >> .ci-v4-input/goodjob-c009-fixes-v4.patch
           patch --batch --fuzz=0 -p1 --dry-run < .ci-v4-input/goodjob-c009-fixes-v4.patch
           patch --batch --fuzz=0 -p1 < .ci-v4-input/goodjob-c009-fixes-v4.patch
           git diff --stat
