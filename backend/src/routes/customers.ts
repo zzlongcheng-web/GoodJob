@@ -1077,6 +1077,10 @@ export function registerCustomersRoutes(app: Express) {
     const store = getStore();
     const customer = findWritableCustomer(req.user!, req.params.id, res);
     if (!customer) return;
+    if (req.user!.role === "sales" || !hasIamPermission(req.user!, "customer.activity.delete")) {
+      res.status(403).json({ message: "普通业务员不能删除客户沟通记录；如需更正，请联系主管归档处理" });
+      return;
+    }
     const index = store.customerActivities.findIndex(
       (item) => item.id === req.params.activityId && item.customerId === customer.id
     );
