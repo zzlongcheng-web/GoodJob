@@ -122,7 +122,7 @@ const salesPermissions = new Set([
 ]);
 
 const managerExtraPermissions = new Set([
-  "lead.assign", "lead.export", "customer.assign", "report.export", "supplier.delete",
+  "lead.assign", "lead.export", "customer.assign", "customer.delete", "report.export", "supplier.delete",
   "deal.stage.override",
   "order.status.override",
   "commission.manage", "document.approve", "agent.manage", "integration.manage", "integration.approval.act", "training.manage",
