@@ -108,7 +108,7 @@ export const PLATFORM_PERMISSION_CODES = [
 
 const salesPermissions = new Set([
   "workspace.dashboard.read", "workspace.dashboard.manage", "lead.read", "lead.create", "lead.update", "lead.delete",
-  "customer.read", "customer.create", "customer.update", "customer.delete", "customer.pool.claim",
+  "customer.read", "customer.create", "customer.update", "customer.pool.claim",
   "customer.pool.release", "customer.export", "supplier.read", "supplier.create", "supplier.update",
   "deal.read", "deal.create", "deal.update", "deal.delete",
   "deal.stage.advance", "deal.quote.create", "report.read", "daily_report.read",
