@@ -962,6 +962,9 @@ export async function createAppRuntime(config: AppConfig): Promise<AppRuntime> {
   app.delete(
     "/api/v1/accounts/:id",
     asyncRoute(async (request, response) => {
+      if (request.crmIdentity!.role === "sales") {
+        throw new DomainError("ROLE_DELETE_FORBIDDEN", 403, "普通员工无权删除 WhatsApp 账号及历史记录");
+      }
       const account = await ownedAccount(request, routeParam(request.params.id));
       const routingReferences = await repository.countRoutingReferences(account.id);
       if (routingReferences > 0) {
@@ -1572,10 +1575,8 @@ export async function createAppRuntime(config: AppConfig): Promise<AppRuntime> {
       const input = messageSchema.parse(request.body);
       const conversation = await repository.getConversation(routeParam(request.params.id), request.crmIdentity!.userId);
       if (!conversation) {
-        const visibleConversation = await repository.getConversation(routeParam(request.params.id));
-        if (visibleConversation && visibleConversation.accountId !== input.accountId) {
-          throw new DomainError("ACCOUNT_MISMATCH", 409, "Selected account does not own this conversation");
-        }
+        // Never query a conversation without the current owner. A 409 here would reveal
+        // that another employee's guessed conversation id exists.
         throw new DomainError("CONVERSATION_NOT_FOUND", 404, "Conversation not found");
       }
       if (conversation.accountId !== input.accountId) throw new DomainError("ACCOUNT_MISMATCH", 409, "Selected account does not own this conversation");
@@ -1615,6 +1616,9 @@ export async function createAppRuntime(config: AppConfig): Promise<AppRuntime> {
   app.post(
     "/api/v1/messages/:id/revoke",
     asyncRoute(async (request, response) => {
+      if (request.crmIdentity!.role === "sales") {
+        throw new DomainError("ROLE_DELETE_FORBIDDEN", 403, "普通员工无权撤回或销毁 WhatsApp 沟通记录");
+      }
       const body = z.object({ accountId: z.string().uuid() }).parse(request.body);
       await ownedAccount(request, body.accountId);
       const message = await repository.getMessage(routeParam(request.params.id), request.crmIdentity!.userId);
