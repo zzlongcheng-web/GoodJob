@@ -29,11 +29,10 @@ else
   SESSION_COOKIE_SECURE=false
 fi
 
-DEFAULT_INITIAL_ADMIN_EMAIL="admin@goodjob.com"
-DEFAULT_INITIAL_ADMIN_NAME="GoodJob Admin"
+DEFAULT_INITIAL_ADMIN_NAME="Golden Gain Admin"
 
-read -r -p "首次超级管理员邮箱 [$DEFAULT_INITIAL_ADMIN_EMAIL]：" INITIAL_ADMIN_EMAIL
-INITIAL_ADMIN_EMAIL="${INITIAL_ADMIN_EMAIL:-$DEFAULT_INITIAL_ADMIN_EMAIL}"
+read -r -p "首次超级管理员邮箱（必须输入公司管理员真实邮箱）：" INITIAL_ADMIN_EMAIL
+[[ -n "$INITIAL_ADMIN_EMAIL" ]] || die "必须填写真实管理员邮箱，不允许使用默认共享账号"
 [[ "$INITIAL_ADMIN_EMAIL" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,63}$ ]] \
   || die "管理员邮箱格式不正确"
 read -r -p "首次超级管理员姓名 [$DEFAULT_INITIAL_ADMIN_NAME]：" INITIAL_ADMIN_NAME
@@ -65,16 +64,6 @@ fi
 install -d -m 0700 "$SECRETS_DIR" "$STATE_DIR" "$BACKUP_DIR"
 printf '%s' "$INITIAL_ADMIN_PASSWORD" > "$SECRETS_DIR/initial_admin_password"
 unset INITIAL_ADMIN_PASSWORD
-{
-  printf '序号\t管理员名称\t登录邮箱\t团队编号\t初始密码\n'
-  for sequence in $(seq 1 50); do
-    number="$(printf '%02d' "$sequence")"
-    team_number="$(printf '%03d' "$sequence")"
-    password="$(openssl rand -hex 24)"
-    printf '%s\tGoodJob Admin %s\tbeta-admin-%s@goodjob-crm.com\tbeta-%s\t%s\n' \
-      "$sequence" "$number" "$number" "$team_number" "$password"
-  done
-} > "$SECRETS_DIR/admin_credentials.tsv"
 openssl rand -hex 32 > "$SECRETS_DIR/mysql_password"
 openssl rand -hex 32 > "$SECRETS_DIR/mysql_root_password"
 openssl rand -hex 32 > "$SECRETS_DIR/postgres_password"
@@ -119,7 +108,7 @@ INITIAL_ADMIN_EMAIL=$INITIAL_ADMIN_EMAIL
 INITIAL_ADMIN_NAME=$INITIAL_ADMIN_NAME
 MYSQL_DATABASE=goodjob_crm_prod
 MYSQL_USER=goodjob_crm_app
-ENABLE_API_DOCS=true
+ENABLE_API_DOCS=false
 GOODJOB_BACKUP_RETENTION_COUNT=10
 MYSQL_MEMORY_LIMIT=768m
 MYSQL_CPU_LIMIT=1.0
@@ -131,6 +120,5 @@ EOF
 chmod 0600 "$ENV_FILE"
 
 log "配置已写入 $SHARED_DIR"
-log "超级管理员密码和 50 个管理员凭据只保存在 $SECRETS_DIR，安装包和镜像不含明文密码"
-log "50 个管理员凭据文件：$SECRETS_DIR/admin_credentials.tsv"
+log "管理员初始化密码只保存在 $SECRETS_DIR，安装包和镜像不含明文密码"
 log "下一步执行：./preflight.sh"
