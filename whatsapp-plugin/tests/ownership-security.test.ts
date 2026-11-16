@@ -44,6 +44,13 @@ describe("personal WhatsApp ownership", () => {
       .send({ name: "Alice WhatsApp", provider: "baileys", riskAccepted: true })
       .expect(201);
     accountId = created.body.id;
+    const added = await request(runtime.app)
+      .post("/api/v1/contacts")
+      .set(alice)
+      .send({ accountId, displayName: "Alice Only Contact", phone: "+14155550115" })
+      .expect(201);
+    contactId = added.body.contact.id;
+    conversationId = added.body.conversation.id;
   });
 
   afterAll(async () => runtime.close());
@@ -52,6 +59,35 @@ describe("personal WhatsApp ownership", () => {
     await request(runtime.app).get("/api/v1/accounts").set(bob).expect(200).expect([]);
     await request(runtime.app).get(`/api/v1/accounts/${accountId}/meta`).set(bob).expect(404);
     await request(runtime.app).post(`/api/v1/accounts/${accountId}/connect`).set(bob).send({}).expect(404);
+  });
+
+  it("blocks cross-employee contact, conversation, message and media operations", async () => {
+    await request(runtime.app).get("/api/v1/conversations").set(bob).expect(200).expect([]);
+    await request(runtime.app).get("/api/v1/contacts").set(bob).expect(200).expect([]);
+    await request(runtime.app).get(`/api/v1/conversations?accountId=${accountId}`).set(bob).expect(404);
+    await request(runtime.app).get(`/api/v1/conversations/${conversationId}/messages`).set(bob).expect(404);
+    await request(runtime.app).post(`/api/v1/contacts/${contactId}/conversation`).set(bob).expect(404);
+
+    // The wrong-account case must return 404 as well: 409 would leak that Alice's
+    // conversation id is real despite Bob having no access to it.
+    await request(runtime.app)
+      .post(`/api/v1/conversations/${conversationId}/messages`)
+      .set(bob)
+      .send({ accountId: "00000000-0000-4000-8000-000000000002", clientMessageId: "bob-foreign-write-001", body: "not authorized" })
+      .expect(404);
+
+    await request(runtime.app)
+      .post(`/api/v1/conversations/${conversationId}/media`)
+      .set(bob)
+      .query({ accountId, clientMessageId: "bob-foreign-media-001", kind: "file", fileName: "test.txt", mimeType: "text/plain" })
+      .set("content-type", "application/octet-stream")
+      .send(Buffer.from("access denied"))
+      .expect(404);
+
+    const aliceMessages = await request(runtime.app)
+      .get(`/api/v1/conversations/${conversationId}/messages`)
+      .set(alice).expect(200);
+    expect(Array.isArray(aliceMessages.body)).toBe(true);
   });
 
   it("rejects missing and forged session identities", async () => {
