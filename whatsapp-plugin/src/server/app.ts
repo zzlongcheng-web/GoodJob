@@ -1572,10 +1572,8 @@ export async function createAppRuntime(config: AppConfig): Promise<AppRuntime> {
       const input = messageSchema.parse(request.body);
       const conversation = await repository.getConversation(routeParam(request.params.id), request.crmIdentity!.userId);
       if (!conversation) {
-        const visibleConversation = await repository.getConversation(routeParam(request.params.id));
-        if (visibleConversation && visibleConversation.accountId !== input.accountId) {
-          throw new DomainError("ACCOUNT_MISMATCH", 409, "Selected account does not own this conversation");
-        }
+        // Never query a conversation without the current owner. A 409 here would reveal
+        // that another employee's guessed conversation id exists.
         throw new DomainError("CONVERSATION_NOT_FOUND", 404, "Conversation not found");
       }
       if (conversation.accountId !== input.accountId) throw new DomainError("ACCOUNT_MISMATCH", 409, "Selected account does not own this conversation");
