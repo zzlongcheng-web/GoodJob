@@ -53,7 +53,7 @@ export interface MonthlyNewCustomerInput {
 }
 
 const monthPattern = /^(?:19|20|21)\d{2}-(?:0[1-9]|1[0-2])$/u;
-const noContact = /未接通|无人接听|未回复|未联系|待联系|呼叫失败|拨号失败|拒接|未沟通|no answer|no reply|no response|voicemail|missed call/iu;
+const noContact = /未接通|无人接听|未回复|未联系|待联系|呼叫失败|拨号失败|拒接|未沟通|期待.{0,12}回复|等待.{0,12}回复|待.{0,12}回复|尚未.{0,12}回复|no answer|no reply|no response|awaiting reply|waiting for reply|voicemail|missed call/iu;
 const meaningfulContext = /客户|采购|报价|价格|订单|样品|通话|会议|沟通|回复|确认|customer|buyer|client|meeting|spoke|discussed/iu;
 const customerReply = /客户.{0,10}(?:回复|确认|反馈|答复|回应)|对方.{0,10}(?:回复|确认|反馈)|(?:customer|buyer|client).{0,15}(?:replied|responded|confirmed)/iu;
 
