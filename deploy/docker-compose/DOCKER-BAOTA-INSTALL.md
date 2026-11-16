@@ -1,456 +1,130 @@
-# GoodJob CRM 1.7.2 安装与更新说明
+# Golden Gain CRM — Docker / 宝塔部署与更新手册（安全修订版）
 
-## 真实物流查询
+> **唯一有效的部署原则：从经过代码审查、CI 通过的固定 Git 提交构建应用。**
+> 本文档已取代历史“公开仓库镜像最小包”安装教程。严禁按照旧步骤下载外部预构建的 CRM backend、communication 或 gateway 镜像。
+> **本文档仅用于测试环境准备；正式上线必须先完成备份恢复、账号隔离与安全验收。**
 
-发货管理中的「真实查询」会由 backend 调用 17TRACK API，返回承运商实际提供的最新扫描位置和轨迹。物流服务通常不会返回收货人的精确门牌地址，界面中的「收货地址」仍来自 CRM 发货单或关联单据，不能把两者混为一谈。
+## 1. 范围和准备
 
-首次配置时可填写 17TRACK API Token；如果暂时留空，应用仍可安装，但点击真实查询时会提示未配置 Token：
+- 本目录是 **deploy/docker-compose**；源码同时包含 backend、frontend、whatsapp-plugin、integration-worker 等模块。
+- 推荐在独立 VPS 安装，不修改现有 WordPress 网站。示例域名：**crm.goldengainmachinery.com**，实际以 DNS 为准。
+- 需要 Linux (Ubuntu)、Docker Engine、Docker Compose v2、Git 和至少 10 GiB 可用磁盘；内存按并发与实际负载验证。
+- MySQL、后端、Communication 和内部网关由 Docker Compose 管理；在宿主机上只开放必要的 80/443，禁止公网开放 3306、3100、4188。
+- **禁止引入旧的外部应用镜像和旧版安装包。** 可按官方来源使用 MySQL 等基础镜像，但应用镜像必须由本次审核源码构建。
+- 本手册使用 **local** 镜像模式。registry 模式仅可使用另行审核并明确配置的私有可信镜像，绝不默认拉取第三方仓库。
 
-```text
-17TRACK API Token（可留空，之后可补配）
-```
+## 2. 从已审核的固定提交取得源码
 
-申请 Token 后，在服务器执行以下命令写入受限运行密钥，再重启 backend：
+在运维电脑或独立测试 VPS 上运行；由审查负责人提供完整 40 位、CI 通过的提交号：
 
-```bash
-read -r -s TRACKING_TOKEN
-printf '\\n'
-printf 'TRACKING_PROVIDER=17track\\nTRACKING_17TRACK_TOKEN=%s\\n' "$TRACKING_TOKEN" >> /opt/goodjobcrm/shared/secrets/crm_runtime_env
-unset TRACKING_TOKEN
-chmod 0640 /opt/goodjobcrm/shared/secrets/crm_runtime_env
-cd /root/GoodJob-CRM-Registry-1.7.2
-./manage.sh restart
-```
+~~~bash
+git clone https://github.com/zzlongcheng-web/GoodJob.git /opt/goodjobcrm-src
+cd /opt/goodjobcrm-src
+APPROVED_SHA="填写已批准的完整40位提交号"
+git checkout --detach "$APPROVED_SHA"
+test "$(git rev-parse HEAD)" = "$APPROVED_SHA"
+git status --short
+~~~
 
-不要把 Token 写入前端、Compose 文件、公开仓库或聊天记录。
+必须确保工作区没有未审查的修改。不要执行旧文档中的外部镜像拉取、未经审核的更新计划任务，或从第三方 SVN 仓库取得应用源码。
 
-这是 GoodJob CRM 的最小 Docker 部署包。安装包只包含部署脚本和 Compose 配置，服务器会从公开 ACR 仓库拉取三个镜像，不包含源码、数据库备份或业务数据。
+## 3. 首次配置（独立、空白测试环境）
 
-## 1. 固定信息
+Docker 尚未安装时，可先审查并运行本目录的 **install-docker-ubuntu.sh**；它只安装系统 Docker 组件，不等于已完成 CRM 安全验收。
 
-```text
-版本：1.7.2
-前端域名：https://crm.nanmianyun.com
-宿主机内部入口：http://127.0.0.1:4188
-项目名：goodjobcrm
-数据目录：/opt/goodjobcrm/shared
-```
+~~~bash
+cd /opt/goodjobcrm-src/deploy/docker-compose
+sudo ./configure.sh
+~~~
 
-公开镜像：
+按照提示输入真实的公司管理邮箱（不得使用共享演示账号）、管理员姓名、强随机密码、CRM 域名及 HTTPS 状态。配置写在 **/opt/goodjobcrm/shared/deploy.env**，密钥保存在 **/opt/goodjobcrm/shared/secrets/**；不要提交到 Git、聊天记录或截图。
 
-```text
-crpi-f1g4pi9vyexdaer5.cn-hongkong.personal.cr.aliyuncs.com/kevin_goodjobcrm/backend:1.7.2
-crpi-f1g4pi9vyexdaer5.cn-hongkong.personal.cr.aliyuncs.com/kevin_goodjobcrm/communication:1.7.2
-crpi-f1g4pi9vyexdaer5.cn-hongkong.personal.cr.aliyuncs.com/kevin_goodjobcrm/gateway:1.7.2
-```
+**必须核对**：
 
-仓库是公开的，服务器端**不需要执行 `docker login`**。
+~~~bash
+sudo grep -E '^(GOODJOB_IMAGE_MODE|ENABLE_API_DOCS|DOMAIN|PUBLIC_SCHEME|SESSION_COOKIE_SECURE)=' \
+  /opt/goodjobcrm/shared/deploy.env
+~~~
 
-首次全新安装会创建 1 个超级管理员和 50 个团队管理员：
+验收要求：
+- GOODJOB_IMAGE_MODE=local
+- ENABLE_API_DOCS=false
+- 生产 HTTPS 时 PUBLIC_SCHEME=https 且 SESSION_COOKIE_SECURE=true
+- 不存在任何未经审核的应用镜像仓库引用
+- 首次部署仅创建明确配置的公司管理员；**不会自动创建 40 或 50 个公测管理员**
 
-```text
-超级管理员：使用 ./configure.sh 时填写的邮箱和密码
-50 个团队管理员凭据：/opt/goodjobcrm/shared/secrets/admin_credentials.tsv
-```
+本次 Docker 安装方式已删除自动创建 50 名测试管理员的调用及相关密钥生成。已有数据库中的历史账号不会因代码升级而自动删除；必须在备份后由授权管理员逐一审查和停用。
 
-50 个团队管理员账号为 `beta-admin-01@goodjob-crm.com` 到 `beta-admin-50@goodjob-crm.com`，分别对应 `beta-001` 到 `beta-050` 团队。密码由服务器首次配置时随机生成，不写入镜像、SVN 或部署包。首次登录后立即修改密码；已有数据库更新时，脚本只会补齐缺失账号，不会覆盖已有密码。
+## 4. 预检、构建及首次启动
 
-## 2. 安装前检查
+**前提：** 使用固定提交的完整源码，并已核对实际服务器、安全配置和域名。
 
-服务器建议准备：
+~~~bash
+cd /opt/goodjobcrm-src/deploy/docker-compose
+sudo ./preflight.sh
+sudo env GOODJOB_RELEASE_ID="$APPROVED_SHA" GOODJOB_BUILD_BEFORE_INSTALL=true ./install.sh
+sudo ./manage.sh status
+~~~
 
-- Linux x86_64；
-- Docker Engine 和 Docker Compose v2；
-- 至少 10 GiB 可用磁盘；
-- 至少 2 GiB 可用内存，低内存测试环境必须使用下方的低内存开关；
-- 域名 `crm.nanmianyun.com` 的 DNS A 记录指向服务器公网 IP；
-- 宝塔中已创建 `crm.nanmianyun.com` 网站，并已准备该域名证书；
-- 防火墙允许 80/tcp、443/tcp。不要对公网开放 3306、3100、4188。
+如果 **APPROVED_SHA** 未从前述 shell 会话保留，请重新赋值并核对；不要使用空值。此流程本地编译当前源码并构建 Docker 应用镜像，不应从外部仓库获取应用镜像。不要将此示例当作已经完成实际 VPS 部署。
 
-查看已有资源：
+健康检查：
 
-```bash
-docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Ports}}\t{{.Status}}'
-docker network ls
-docker volume ls
-ss -lntp
-free -h
-df -h
-```
-
-## 3. 上传安装包
-
-本机执行上传（在存放安装包的目录下执行），不能在服务器终端执行本机路径：
-
-```bash
-scp \
-  "dist-packages/GoodJob-CRM-Registry-1.7.2.tar.gz" \
-  "dist-packages/GoodJob-CRM-Registry-1.7.2.tar.gz.sha256" \
-  root@服务器公网IP:/root/
-```
-
-服务器上校验并解压：
-
-```bash
-cd /root
-sha256sum -c GoodJob-CRM-Registry-1.7.2.tar.gz.sha256
-tar -xzf GoodJob-CRM-Registry-1.7.2.tar.gz
-cd GoodJob-CRM-Registry-1.7.2
-chmod +x *.sh
-```
-
-校验必须显示：
-
-```text
-GoodJob-CRM-Registry-1.7.2.tar.gz: OK
-```
-
-## 4. 首次配置
-
-```bash
-./configure.sh
-```
-
-按提示填写：
-
-```text
-GoodJob 专属域名：crm.nanmianyun.com
-当前是否已经启用 HTTPS：y
-首次超级管理员邮箱：admin@goodjob.com
-首次超级管理员姓名：GoodJob Admin
-首次超级管理员密码：设置一个至少 12 位的强密码
-```
-
-密码输入时终端不会回显。配置脚本会在服务器本地生成数据库密码、JWT 密钥和其他运行密钥，保存到：
-
-```text
-/opt/goodjobcrm/shared/secrets
-```
-
-不要复制、上传或公开这个目录。当前版本默认 MySQL 容器内存上限为 `768m`。
-
-## 5. 预检与首次启动
-
-先执行预检：
-
-```bash
-./preflight.sh
-```
-
-如果只提示可用内存低于 2 GiB，但确认服务器允许继续，必须在同一个终端会话执行：
-
-```bash
-export GOODJOB_ALLOW_LOW_MEMORY=true
-./preflight.sh
-```
-
-预检通过后启动：
-
-```bash
-./install.sh
-```
-
-安装脚本会拉取三个 `1.7.2` 镜像、创建 GoodJob 专属网络和数据卷、启动 MySQL 8.4、执行幂等迁移、创建首次超级管理员和 50 个团队管理员、启动三个应用容器并检查健康状态。
-
-查看状态：
-
-```bash
-./manage.sh status
-docker ps --filter name=goodjobcrm \
-  --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'
-```
-
-内部健康检查：
-
-```bash
+~~~bash
 curl -fsS http://127.0.0.1:4188/api/health
-```
+~~~
 
-正常结果包含：
+还须人工检查 **docker compose** 的实际镜像来源、运行容器、健康状态、日志和 MySQL 配置（MySQL 要求 log_bin 关闭）。核对应用显示 Golden Gain CRM。
 
-```json
-{"ok":true,"store":"mysql"}
-```
+## 5. 宝塔 / Nginx 域名与 HTTPS
 
-## 6. 宝塔 Nginx 反向代理
+- 单独创建 CRM 子域名的网站配置。只修改 CRM 自己的 server 块，不能覆盖现有外贸独立站、其他域名或全局配置。
+- 将 CRM HTTPS 网站的请求反向代理到 **127.0.0.1:4188**；WebSocket 所需 Upgrade/Connection 头应保留。
+- 在宝塔中签发有效 TLS 证书后配置 HTTPS，并确认安全 Cookie 和正确的 PUBLIC_ORIGIN。
+- 修改 Nginx 前备份站点配置，验证 **nginx -t** 通过才重载；不要重复创建已有的 location /。
+- 上线前从外网检查 3306、3100、4188 不可直接访问，API 调试文档不公开。
 
-只修改 `crm.nanmianyun.com` 这个 GoodJob 专属网站，不要修改其他网站、全局 Nginx 配置或其他项目的 server 块。
+## 6. 备份、恢复、更新（必须先演练）
 
-先找到实际配置文件：
+### 备份
 
-```bash
-grep -RnlE '^[[:space:]]*server_name[[:space:]]+crm\.nanmianyun\.com([[:space:]]|;)' \
-  /www/server/panel/vhost/nginx 2>/dev/null
-```
+~~~bash
+cd /opt/goodjobcrm-src/deploy/docker-compose
+sudo ./backup.sh
+~~~
 
-确认文件内容中的 `server_name` 是：
+备份包含 MySQL、上传文件和 Communication 媒体，以及包含敏感密钥的部署配置。核验 SHA256SUMS，并加密、限制访问、异地保存；不能仅在同一块 VPS 磁盘上保留备份。应配置每日自动备份并定期检查。
 
-```nginx
-server_name crm.nanmianyun.com;
-```
+### 恢复
 
-编辑该网站的 HTTPS `server { ... }` 配置，在其中加入下面两个 location。`^~ /assets/` 必须保留，用于绕过宝塔旧的 JS/CSS 正则规则：
+**restore.sh 会覆盖数据库及文件，只能在隔离测试 VPS 上演练。** 先确认备份路径、恢复前后记录数及实际登录功能，禁止直接在生产库执行示例恢复。
 
-```nginx
-location ^~ /assets/ {
-    proxy_pass http://127.0.0.1:4188;
-    proxy_http_version 1.1;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-    proxy_read_timeout 300s;
-}
+### 更新
 
-location / {
-    proxy_pass http://127.0.0.1:4188;
-    proxy_http_version 1.1;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-    proxy_read_timeout 300s;
-}
-```
+1. 技术负责人批准新提交 SHA；复核完整 CI、安全审计、兼容性、迁移及备份。
+2. 用 Git 按完整 SHA 更新独立源码目录，核对 HEAD，无未审查的工作区修改。
+3. 在当前 CRM 部署版本稳定的前提下，先生成并验证备份，再按固定 SHA 进行本地构建与安装。
+4. 验证健康检查、真实权限、订单/客户数据、WhatsApp 账号映射、文件读写及任务报表。
+5. **rollback.sh 只回滚应用镜像，不反向执行数据库迁移。** 需要恢复数据库时必须基于经验证的备份，由技术负责人批准执行。
 
-如果配置中已经存在 `location /`，不要增加第二个同名块，应将原 `location /` 内容替换为上面的版本。原网站的 SSL、证书、日志、`.well-known` 和其他域名配置不要改动。
+**不要使用 update-docker.sh / update-from-svn.sh 作为默认升级入口**：后者依赖显式指定的 SVN 源，不能用它自动寻找新版本；宝塔旧版定时“拉取远端镜像”的计划任务必须停用。
 
-修改前备份，检查通过后再重载：
+## 7. Ubuntu 非 Docker 安装方式的强制约束
 
-```bash
-cp -a /www/server/panel/vhost/nginx/实际配置文件 \
-  /root/crm.nanmianyun.com.conf.bak.$(date +%Y%m%d%H%M%S)
+根目录的 **deploy-ubuntu.sh** 属于另一种部署方式，不能和 Docker 安装混用。其安全修订版要求：
 
-nginx -t && systemctl reload nginx
-```
+- PROVISION_BETA_ADMINS 默认 false；即使被显式设成 true，脚本也会立即拒绝执行。
+- ENABLE_API_DOCS 默认 false。
+- 必须在隔离测试服务器和已审核源码上使用；不准凭旧文档在现有生产服务器直接运行。
 
-若服务器的 Nginx 命令不在 PATH，使用：
+## 8. 上线阻断条件
 
-```bash
-/www/server/nginx/sbin/nginx -t && systemctl reload nginx
-```
+任何一项不满足都不得导入正式客户数据：
+- 当前提交的全部 CI、编译和浏览器冒烟测试成功，有 GitHub 原始日志。
+- 没有默认固定密码的超级管理员；历史演示/公测账号已由管理员逐个核实和停用。
+- 剩余 High 风险依赖已经评估和接受或修复，密钥、权限、审计日志合规。
+- 备份恢复演练通过，并有异地备份。
+- 真实 5–15 人角色隔离、WhatsApp 多账号隔离、任务/绩效、重要客户流程通过验收。
+- 已检查部署的确是批准提交构建的镜像，没有旧应用镜像，也没有自动第三方升级任务。
 
-`nginx -t` 失败时不要 reload，先恢复刚才的站点配置备份。
-
-## 7. 上线验收
-
-先绕过公网 DNS 检查 Nginx 的域名匹配：
-
-```bash
-curl -I http://127.0.0.1 -H 'Host: crm.nanmianyun.com'
-curl -kI https://127.0.0.1 -H 'Host: crm.nanmianyun.com'
-```
-
-检查 API 反代：
-
-```bash
-curl -kfsS https://127.0.0.1/api/health \
-  -H 'Host: crm.nanmianyun.com'
-```
-
-检查前端 JS 资源，必须返回 `200`：
-
-```bash
-curl -kI https://127.0.0.1/assets/index-CA-XoN24.js \
-  -H 'Host: crm.nanmianyun.com'
-```
-
-最后打开：
-
-```text
-https://crm.nanmianyun.com
-```
-
-超级管理员登录：
-
-```text
-使用 `./configure.sh` 中填写的邮箱和密码
-
-50 个团队管理员的账号密码：
-
-```bash
-column -t -s $'\t' /opt/goodjobcrm/shared/secrets/admin_credentials.tsv
-```
-```
-
-如果浏览器仍显示旧页面，Mac 使用 `Command + Shift + R`，Windows 使用 `Ctrl + F5`。
-
-### MySQL binlog 必须关闭
-
-本项目要求 MySQL 关闭 binlog。MySQL 8.0 起 binlog 默认开启，所以 `compose.yml` 给 mysql
-加了 `--disable-log-bin`，安装/升级脚本在迁移后会验收 `@@log_bin`，后端和迁移程序启动时也会检查，
-生产环境发现开启会拒绝启动。手动确认：
-
-```bash
-cd /opt/goodjobcrm/current/deploy/docker-compose
-docker compose --project-name goodjobcrm --env-file /opt/goodjobcrm/shared/deploy.env -f compose.yml \
-  exec -T mysql sh -c 'MYSQL_PWD="$(cat /run/secrets/mysql_root_password)" mysql -uroot -e "SELECT @@log_bin"'
-```
-
-返回 `0` 表示已关闭。旧版本部署过的服务器，升级后数据卷里还会留下以前的 `binlog.0000xx` 文件，
-它们不再被使用，确认 `@@log_bin` 为 0 后可以删除以释放磁盘：
-
-```bash
-docker compose --project-name goodjobcrm --env-file /opt/goodjobcrm/shared/deploy.env -f compose.yml \
-  exec -T mysql sh -c 'ls -lh /var/lib/mysql/binlog.* 2>/dev/null; rm -f /var/lib/mysql/binlog.[0-9]* /var/lib/mysql/binlog.index'
-```
-
-## 8. 日常管理
-
-```bash
-cd /root/GoodJob-CRM-Registry-1.7.2
-./manage.sh status
-./manage.sh logs 200
-./manage.sh restart
-./manage.sh stop
-./manage.sh start
-```
-
-`stop` 只停止 GoodJob 容器，不会停止其他项目。不要执行：
-
-```bash
-docker compose down -v
-```
-
-`-v` 会删除 GoodJob 数据卷。
-
-## 9. 备份与更新
-
-手动备份：
-
-```bash
-./backup.sh
-```
-
-备份目录：
-
-```text
-/opt/goodjobcrm/shared/backups
-```
-
-以后发布新业务版本时，可以直接通过宝塔计划任务更新，不必再次上传最小部署包。
-
-首次安装成功后，`install.sh` 会自动创建：
-
-```text
-/opt/goodjobcrm/ops/baota-update.sh
-/opt/goodjobcrm/ops/runtime/
-```
-
-如果当前服务器是在加入此入口前安装的 1.7.2，先在当前部署包目录执行一次：
-
-```bash
-install -d -m 0700 /opt/goodjobcrm/ops /opt/goodjobcrm/ops/runtime
-cp -a ./deploy/docker-compose/. /opt/goodjobcrm/ops/runtime/
-chmod +x /opt/goodjobcrm/ops/runtime/*.sh
-install -m 0700 ./baota-update.sh /opt/goodjobcrm/ops/baota-update.sh
-```
-
-在宝塔“计划任务”中添加 Shell 脚本任务，任务类型选择“Shell 脚本”，脚本内容填写：
-
-```bash
-/opt/goodjobcrm/ops/baota-update.sh 1.7.3 >> /opt/goodjobcrm/shared/baota-update.log 2>&1
-```
-
-执行用户选择 `root`，周期选择“手动执行”或按你的发布节奏设置。以后更新只需要：
-
-1. 在电脑发布三个新镜像；
-2. 把计划任务脚本中的版本号改成新版本，例如 `1.7.3`；
-3. 点击计划任务的“执行”；
-4. 在计划任务日志或 `/opt/goodjobcrm/shared/baota-update.log` 查看结果。
-
-入口会直接调用现有更新流程，拉取对应版本的公开镜像。它会备份 MySQL、上传文件和
-Communication 媒体，执行迁移、健康检查和应用回退；不会执行 `docker compose down -v`，
-也不会删除 GoodJob 数据卷。服务器端不需要 `docker login`。
-
-仍可使用命令行方式排查或手动更新：
-
-```bash
-cd /root/GoodJob-CRM-Registry-新版本目录
-export GOODJOB_ALLOW_LOW_MEMORY=true
-./update-registry.sh 新版本号
-```
-
-例如更新到 `1.7.3`：
-
-```bash
-cd /root/GoodJob-CRM-Registry-1.7.3
-./update-registry.sh 1.7.3
-```
-
-更新脚本会拉取三个新镜像、先备份 MySQL、执行数据库迁移并启动新容器。数据保存在 MySQL Docker 卷和 `/opt/goodjobcrm/shared`，正常更新不会删除业务数据。
-
-如果之前手动调整过 MySQL 内存，更新前确认：
-
-```bash
-grep '^MYSQL_MEMORY_LIMIT=' /opt/goodjobcrm/shared/deploy.env
-```
-
-应为：
-
-```text
-MYSQL_MEMORY_LIMIT=768m
-```
-
-应用镜像回滚：
-
-```bash
-./rollback.sh
-```
-
-数据库恢复属于破坏性操作，只能在确认备份和恢复点后执行：
-
-```bash
-./restore.sh /opt/goodjobcrm/shared/backups/具体时间戳
-```
-
-## 10. 常见问题
-
-### 预检提示内存不足
-
-确认 MySQL 当前限制：
-
-```bash
-docker stats --no-stream goodjobcrm-mysql-1
-```
-
-测试环境继续安装：
-
-```bash
-export GOODJOB_ALLOW_LOW_MEMORY=true
-./install.sh
-```
-
-如果 MySQL unhealthy，先检查：
-
-```bash
-docker inspect goodjobcrm-mysql-1 \
-  --format 'status={{.State.Status}} health={{.State.Health.Status}} oom={{.State.OOMKilled}}'
-docker logs --tail 100 goodjobcrm-mysql-1
-```
-
-### 前端 JS 返回 404
-
-直连 Gateway：
-
-```bash
-curl -I http://127.0.0.1:4188/assets/index-CA-XoN24.js
-```
-
-如果直连是 `200`、域名访问是 `404`，说明宝塔旧的 JS/CSS location 抢先匹配，检查第 6 节的 `location ^~ /assets/`。
-
-### 登录提示账号或密码错误
-
-`INITIAL_ADMIN_EMAIL` 和初始密码只对空数据库首次初始化生效，50 个团队管理员凭据只在服务器首次配置时生成并保存。更新镜像不会覆盖已有用户或密码。不要删除数据卷；先检查 `/opt/goodjobcrm/shared/secrets/admin_credentials.tsv`，再使用已知管理员修改密码。
-
-### 4188 无法从公网访问
-
-这是设计行为。4188 只监听 `127.0.0.1`，公网访问必须经过宝塔 Nginx 的 80/443 反向代理。
-
-### 安装包需要登录 ACR 吗
-
-不需要。本版本使用公开镜像，直接执行 `./install.sh` 或 `./update-registry.sh 1.7.2` 即可拉取。
+**许可证声明：** 保留源代码中的 Apache-2.0、GPL 和第三方版权材料；品牌名改变不代表改变许可证。

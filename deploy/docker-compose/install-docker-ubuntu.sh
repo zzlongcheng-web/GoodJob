@@ -30,5 +30,5 @@ systemctl enable --now docker
 docker version
 docker compose version
 printf '\nDocker、Compose、SVN 已安装。下一步执行：\n'
-printf '  svn checkout svn://gitee.com/sendoh-huang/good-job-private /opt/goodjobcrm-src\n'
-printf '  cd /opt/goodjobcrm-src && ./update-docker.sh\n'
+printf '  请先下载并核验已审查的固定提交源码，放到 /opt/goodjobcrm-src\n'
+printf '  cd /opt/goodjobcrm-src/deploy/docker-compose && ./configure.sh\n'\nprintf '  将 /opt/goodjobcrm/shared/deploy.env 中 GOODJOB_IMAGE_MODE 改为 local\n'\nprintf '  然后运行 ./preflight.sh && ./install.sh （请先确保 DNS/HTTPS 已准备）\n'

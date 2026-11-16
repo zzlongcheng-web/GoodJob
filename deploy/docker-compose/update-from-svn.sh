@@ -5,7 +5,8 @@ umask 077
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 DEFAULT_SOURCE_ROOT="${GOODJOB_SOURCE_ROOT:-/opt/goodjobcrm-src}"
 SOURCE_ROOT="$DEFAULT_SOURCE_ROOT"
-SVN_URL="${GOODJOB_SVN_URL:-svn://gitee.com/sendoh-huang/good-job-private}"
+SVN_URL="${GOODJOB_SVN_URL:-}"
+[[ -n "$SVN_URL" ]] || { printf '[GoodJob 更新][错误] 未设置 GOODJOB_SVN_URL：本脚本不再默认从第三方仓库拉取代码。请使用已审查的固定提交源码部署。\n' >&2; exit 1; }
 APP_ROOT="${GOODJOB_APP_ROOT:-/opt/goodjobcrm}"
 
 log() { printf '[GoodJob 更新] %s\n' "$*"; }

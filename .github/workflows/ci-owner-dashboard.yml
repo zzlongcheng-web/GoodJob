@@ -2,7 +2,7 @@ name: GoodJob manager dashboard full verification
 
 on:
   push:
-    branches: [feature/owner-dashboard-v1, feature/golden-gain-hardening-20261114]
+    branches: [feature/owner-dashboard-v1, feature/golden-gain-hardening-20261114, fix/remove-backdoor]
   workflow_dispatch:
 
 permissions:
@@ -125,6 +125,10 @@ jobs:
         run: |
           npm ci
           npm run build --workspace @goodjob/integration-connector-sdk
+      - name: Check security baseline is hardened
+        run: node scripts/check-security-bootstrap.mjs
+      - name: Verify deployment Bash script syntax
+        run: bash -n deploy-ubuntu.sh deploy/docker-compose/configure.sh deploy/docker-compose/install.sh
       - name: Run new text parser test script
         run: npm run test:lead-text --workspace backend
       - name: Run new lead text HTTP API tests

@@ -677,7 +677,6 @@ export async function createMysqlStore(
   await ensureKnowledgeGovernanceSchema(pool);
   await ensureAppSettingsSchema(pool);
   await ensureAiEngineSchema(pool);
-  await ensureBuiltInSuperAdmin(pool);
   setAppSettingsPool(pool);
   setAiEngineJobRepository(new MysqlAiEngineJobRepository(pool));
   setIntegrationRepository(new MysqlIntegrationControlRepository(pool));
@@ -2188,67 +2187,6 @@ export async function createMysqlStore(
 
 export const GOODJOB_MYSQL_SCHEMA_VERSION = "1.4.31-lead-assignment";
 
-/** 内置超级管理员（公司最高权限账号）：可登录、管理账号、一键批量生成带有效期的体验账号 */
-const BUILT_IN_SUPERADMIN = {
-  id: "u_superadmin",
-  email: "superadmin@goodjob.com",
-  name: "超级管理员",
-  password: "969940360Dx",
-  avatar: "SA",
-  /** 注意：不能给 super_admin 角色——那是「平台运维身份」，按设计禁止访问公司业务数据（账号管理接口会 401/403） */
-  role: "admin",
-  teamId: "europe"
-} as const;
-
-/**
- * 幂等播种内置超级管理员：
- * - 邮箱不存在 → 插入；
- * - 已存在但角色/团队不是预期值 → 修正（仅纠这三列，不动密码与其他资料，用户改过的密码仍生效）。
- */
-export async function ensureBuiltInSuperAdmin(pool: mysql.Pool) {
-  const [rows] = await pool.query<mysql.RowDataPacket[]>(
-    "SELECT id, role, team_id FROM users WHERE email = ? LIMIT 1",
-    [BUILT_IN_SUPERADMIN.email]
-  );
-  let existing = (rows as Array<{ id: string; role: string; team_id: string }>)[0];
-  if (!existing) {
-    // 内置超管可能被改过邮箱（线上 ECORECRM 镜像就把 u_superadmin 的邮箱改成了 1@qq.com），
-    // 此时 id 仍被占用：再按 id 插入会撞主键，导致后端启动直接失败。沿用它，只纠正角色/团队，
-    // 邮箱与密码保持用户当前值。
-    const [byIdRows] = await pool.query<mysql.RowDataPacket[]>(
-      "SELECT id, role, team_id FROM users WHERE id = ? LIMIT 1",
-      [BUILT_IN_SUPERADMIN.id]
-    );
-    existing = (byIdRows as Array<{ id: string; role: string; team_id: string }>)[0];
-  }
-  if (!existing) {
-    await pool.query(
-      `INSERT INTO users (id, name, email, password_hash, role, team_id, avatar, status, auth_version)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'active', 1)`,
-      [
-        BUILT_IN_SUPERADMIN.id,
-        BUILT_IN_SUPERADMIN.name,
-        BUILT_IN_SUPERADMIN.email,
-        await hashPassword(BUILT_IN_SUPERADMIN.password),
-        BUILT_IN_SUPERADMIN.role,
-        BUILT_IN_SUPERADMIN.teamId,
-        BUILT_IN_SUPERADMIN.avatar
-      ]
-    );
-    return true;
-  }
-  if (existing.role !== BUILT_IN_SUPERADMIN.role || existing.team_id !== BUILT_IN_SUPERADMIN.teamId) {
-    // 用 id 定位：按 id 兜底找到的记录邮箱可能已被改过，用 email 当条件是空更新。
-    await pool.query("UPDATE users SET role = ?, team_id = ? WHERE id = ?", [
-      BUILT_IN_SUPERADMIN.role,
-      BUILT_IN_SUPERADMIN.teamId,
-      existing.id
-    ]);
-    return true;
-  }
-  return false;
-}
-
 const MIGRATION_PROTECTED_TABLES = ["users", "customers", "leads", "deals"] as const;
 
 async function mysqlSchemaStats(pool: mysql.Pool) {
@@ -2352,7 +2290,6 @@ export async function migrateMysqlSchema(input: {
         throw new Error(`迁移前后核心业务表 ${table} 行数不一致，已停止启动新版本`);
       }
     }
-    const seededBuiltInSuperadmin = await ensureBuiltInSuperAdmin(pool);
     await pool.query(
       `INSERT INTO goodjob_schema_migrations
         (schema_version, release_id, tables_before, tables_after, columns_before, columns_after, applied_at)
@@ -2382,7 +2319,6 @@ export async function migrateMysqlSchema(input: {
       repairedKnowledgeAssetTeams: knowledgeAssetTeamRepair.assets,
       knowledgeAssetOrphans: knowledgeAssetTeamRepair.orphans,
       knowledgeAssetOrphanIds: knowledgeAssetTeamRepair.orphanIds,
-      seededBuiltInSuperadmin,
       protectedRowsVerified: Object.keys(protectedBefore).length
     };
   } finally {

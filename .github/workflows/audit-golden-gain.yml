@@ -1,7 +1,7 @@
 name: Golden Gain critical dependency audit
 on:
   push:
-    branches: [feature/golden-gain-hardening-20261114]
+    branches: [feature/golden-gain-hardening-20261114, fix/remove-backdoor]
 permissions:
   contents: read
 jobs:

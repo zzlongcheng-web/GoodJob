@@ -103,7 +103,7 @@ services:
       WHATSAPP_PLUGIN_PORT: "3100"
       CORS_ORIGINS: ${PUBLIC_ORIGIN}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE}
-      ENABLE_API_DOCS: ${ENABLE_API_DOCS:-true}
+      ENABLE_API_DOCS: ${ENABLE_API_DOCS:-false}
       INBOUND_MAIL_ENABLED: "true"
       INBOUND_MAIL_POLL_MS: "120000"
       INBOUND_MAIL_LOOKBACK_DAYS: "7"
@@ -129,7 +129,6 @@ services:
     secrets: &backend_secrets
       - mysql_password
       - initial_admin_password
-      - admin_credentials
       - crm_runtime_env
     networks:
       - private
@@ -278,8 +277,6 @@ secrets:
     file: ${GOODJOB_SHARED_DIR}/secrets/postgres_password
   initial_admin_password:
     file: ${GOODJOB_SHARED_DIR}/secrets/initial_admin_password
-  admin_credentials:
-    file: ${GOODJOB_SHARED_DIR}/secrets/admin_credentials.tsv
   communication_session_key:
     file: ${GOODJOB_SHARED_DIR}/secrets/communication_session_key
   crm_runtime_env:
