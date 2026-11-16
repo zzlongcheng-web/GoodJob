@@ -90,6 +90,17 @@ describe("personal WhatsApp ownership", () => {
     expect(Array.isArray(aliceMessages.body)).toBe(true);
   });
 
+  it("denies destructive WhatsApp operations to regular sales staff", async () => {
+    await request(runtime.app).delete(`/api/v1/accounts/${accountId}`).set(alice).expect(403);
+    await request(runtime.app)
+      .post("/api/v1/messages/00000000-0000-4000-8000-000000000002/revoke")
+      .set(alice).send({ accountId }).expect(403);
+    await request(runtime.app).delete(`/api/v1/accounts/${accountId}`)
+      .set({ ...alice, "x-crm-role": "admin" }).expect(403);
+    const intact = await request(runtime.app).get("/api/v1/accounts").set(alice).expect(200);
+    expect(intact.body).toHaveLength(1);
+  });
+
   it("rejects missing and forged session identities", async () => {
     await request(runtime.app).get("/api/v1/accounts").expect(401);
     await request(runtime.app).get("/api/v1/accounts").set({ authorization: `Bearer ${token("user-bob")}x` }).expect(401);
