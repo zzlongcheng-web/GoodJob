@@ -15,7 +15,7 @@ import { assertMysqlDataImportToken, beginMysqlDataImport, cancelMysqlDataImport
 import { beginDatabaseBackup, cancelDatabaseBackup, databaseBackupDownload, deleteDatabaseBackup, getDatabaseBackupJob, listDatabaseBackupJobs, mysqlLocalBackupConfig } from "../database-backup.js";
 import { getStore } from "../store.js";
 import { getTodayExchangeRates } from "../exchange-rates.js";
-import { applyUpdate, checkForUpdate, getLastCheckResult, getMirrorConfig, getUpdateProgress, setMirrorUrl } from "../auto-updater.js";
+
 import {
   activeProspectWorkerService,
   asyncRoute,
@@ -92,68 +92,8 @@ export function registerSystemRoutes(app: Express) {
     }
   }));
 
-  // ── 自动更新 API ──────────────────────────────────────────────────
-
-  // 检查更新 (需管理员权限)
-  app.get("/api/admin/updates/check", requireAuth, asyncRoute(async (req, res) => {
-    if (!isPlatformIdentity(req.user) || !hasIamPermission(req.user, "platform.release.manage")) {
-      res.status(403).json({ message: "需要平台发布管理权限" });
-      return;
-    }
-    const status = await checkForUpdate();
-    res.json(status);
-  }));
-
-  // 应用更新 (需管理员权限)
-  app.post("/api/admin/updates/apply", requireAuth, asyncRoute(async (req, res) => {
-    if (!isPlatformIdentity(req.user) || !hasIamPermission(req.user, "platform.release.manage")) {
-      res.status(403).json({ message: "需要平台发布管理权限" });
-      return;
-    }
-    const result = await applyUpdate();
-    if (!result.success) {
-      res.status(409).json({ message: result.message });
-      return;
-    }
-    res.status(202).json({ message: result.message });
-  }));
-
-  // 获取更新进度
-  app.get("/api/admin/updates/progress", requireAuth, asyncRoute(async (req, res) => {
-    if (!isPlatformIdentity(req.user) || !hasIamPermission(req.user, "platform.release.manage")) {
-      res.status(403).json({ message: "需要平台发布管理权限" });
-      return;
-    }
-    const progress = getUpdateProgress();
-    const lastCheck = getLastCheckResult();
-    const config = getMirrorConfig();
-    res.json({ progress, lastCheck, config });
-  }));
-
-  // 配置镜像源 URL
-  app.post("/api/admin/updates/mirror", requireAuth, asyncRoute(async (req, res) => {
-    if (!isPlatformIdentity(req.user) || !hasIamPermission(req.user, "platform.release.manage")) {
-      res.status(403).json({ message: "需要平台发布管理权限" });
-      return;
-    }
-    const { url } = req.body as { url?: string };
-    if (!url || typeof url !== "string") {
-      res.status(400).json({ message: "请提供镜像源 URL" });
-      return;
-    }
-    setMirrorUrl(url.trim());
-    res.json({ message: "镜像源已配置", url: url.trim() });
-  }));
-
-  // 获取镜像源配置
-  app.get("/api/admin/updates/config", requireAuth, asyncRoute(async (req, res) => {
-    if (!isPlatformIdentity(req.user) || !hasIamPermission(req.user, "platform.release.manage")) {
-      res.status(403).json({ message: "需要平台发布管理权限" });
-      return;
-    }
-    const config = getMirrorConfig();
-    res.json(config);
-  }));
+  // Golden Gain release policy: in-app remote updates are disabled.
+  // Only the operator-approved, source-pinned deployment procedure may publish a release.
 
   app.get("/api/system/database-import/status", requireAuth, (req, res) => {
     if (!canManageAccounts(req.user)) {
