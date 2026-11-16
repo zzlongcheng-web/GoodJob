@@ -1,8 +1,8 @@
 name: Golden Gain browser end-to-end regression
 on:
   push:
-    branches: [feature/golden-gain-hardening-20261114]
-    paths: [.github/workflows/e2e-golden-gain.yml]
+    branches: [feature/golden-gain-hardening-20261114, fix/predeploy-hardening-20261116]
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
