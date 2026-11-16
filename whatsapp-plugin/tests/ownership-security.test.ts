@@ -22,6 +22,8 @@ describe("personal WhatsApp ownership", () => {
   const alice = { authorization: `Bearer ${token("user-alice")}` };
   const bob = { authorization: `Bearer ${token("user-bob")}` };
   let accountId = "";
+  let contactId = "";
+  let conversationId = "";
 
   beforeAll(async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), "wa-owner-test-"));
