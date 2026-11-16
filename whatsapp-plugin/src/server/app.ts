@@ -962,6 +962,9 @@ export async function createAppRuntime(config: AppConfig): Promise<AppRuntime> {
   app.delete(
     "/api/v1/accounts/:id",
     asyncRoute(async (request, response) => {
+      if (request.crmIdentity!.role === "sales") {
+        throw new DomainError("ROLE_DELETE_FORBIDDEN", 403, "普通员工无权删除 WhatsApp 账号及历史记录");
+      }
       const account = await ownedAccount(request, routeParam(request.params.id));
       const routingReferences = await repository.countRoutingReferences(account.id);
       if (routingReferences > 0) {
