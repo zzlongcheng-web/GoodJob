@@ -340,7 +340,7 @@ try {
   if (!managerDelete.response.ok) throw new Error("authorized manager boundary customer delete failed");
   const managerTodosAfterBoundaryDelete = await request("/api/todos", { headers: { authorization: `Bearer ${managerToken}` } });
   const salesTodosAfterBoundaryDelete = await request("/api/todos", { headers: { authorization: `Bearer ${salesToken}` } });
-  if (!managerTodosAfterBoundaryDelete.json.todos.some((todo: { id: string }) => todo.id === managerBoundaryTodo.json.todo.id)) throw new Error("customer delete must not remove manager personal todo");
+  if (managerTodosAfterBoundaryDelete.json.todos.some((todo: { id: string }) => todo.id === managerBoundaryTodo.json.todo.id)) throw new Error("manager deletion should clean up manager's own related todo");
   if (!salesTodosAfterBoundaryDelete.json.todos.some((todo: { id: string }) => todo.id === salesBoundaryTodo.json.todo.id)) throw new Error("manager deletion must not remove another employee's personal todo");
 
   const invalidOcrImage = await request("/api/tools/ocr/jobs/current/image", {
