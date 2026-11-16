@@ -1616,6 +1616,9 @@ export async function createAppRuntime(config: AppConfig): Promise<AppRuntime> {
   app.post(
     "/api/v1/messages/:id/revoke",
     asyncRoute(async (request, response) => {
+      if (request.crmIdentity!.role === "sales") {
+        throw new DomainError("ROLE_DELETE_FORBIDDEN", 403, "普通员工无权撤回或销毁 WhatsApp 沟通记录");
+      }
       const body = z.object({ accountId: z.string().uuid() }).parse(request.body);
       await ownedAccount(request, body.accountId);
       const message = await repository.getMessage(routeParam(request.params.id), request.crmIdentity!.userId);
