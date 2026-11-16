@@ -799,6 +799,12 @@ export function registerCommunicationRoutes(app: Express) {
 
   // 删除一条对话记录
   app.delete("/api/whatsapp/messages/:id", requireAuth, asyncRoute(async (req, res) => {
+    // This legacy endpoint predates IAM middleware and must enforce the non-deletion policy itself.
+    // Check role before looking up the message to prevent existence disclosure to sales users.
+    if (req.user!.role === "sales") {
+      res.status(403).json({ message: "普通员工无权删除 WhatsApp 沟通记录" });
+      return;
+    }
     const store = getStore();
     const message = store.whatsappMessages.find((m) => m.id === req.params.id);
     if (!message) {
