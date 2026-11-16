@@ -181,6 +181,26 @@ try {
   check("sales 批量删除本人客户必须 → 403", ownCustomerBulkDelete.response.status === 403, ownCustomerBulkDelete.response.status);
   check("sales 批量删除不能改变客户数据", getStore().customers.some((item) => item.id === "c1"));
 
+  /* ---------------- 旧 WhatsApp 消息接口：员工不得删除本人沟通记录 ---------------- */
+  const ownLegacyWhatsappMessage = {
+    id: "wa_delete_guard_probe",
+    customerId: "c1",
+    direction: "inbound" as const,
+    content: "Customer reply for permission regression",
+    contentTranslated: "",
+    mediaUrl: "",
+    status: "received",
+    waMessageId: "wa_delete_guard_probe_provider",
+    createdAt: "2026-11-16T10:00:00.000Z"
+  };
+  getStore().whatsappMessages.push(ownLegacyWhatsappMessage);
+  const ownWhatsAppDelete = await request("/api/whatsapp/messages/wa_delete_guard_probe", salesToken, {
+    method: "DELETE"
+  });
+  check("sales 删除本人 WhatsApp 消息必须 → 403", ownWhatsAppDelete.response.status === 403, ownWhatsAppDelete.response.status);
+  check("sales 删除 WhatsApp 消息后数据仍保留",
+    getStore().whatsappMessages.some((message) => message.id === ownLegacyWhatsappMessage.id));
+
   /* ---------------- DELETE 撤销 ---------------- */
   const created = await request("/api/customers/c1/activities", management, {
     method: "POST",
