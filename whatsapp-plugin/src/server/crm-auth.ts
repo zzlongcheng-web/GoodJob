@@ -4,6 +4,8 @@ import type { NextFunction, Request, Response } from "express";
 export interface CrmIdentity {
   userId: string;
   authVersion: number;
+  /** Signed by the CRM. Missing or unrecognized legacy claims are least privileged. */
+  role: "sales" | "manager" | "admin";
 }
 
 declare global {
