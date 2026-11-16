@@ -81,8 +81,6 @@ compose --profile tools run --rm backend-migrate
 assert_mysql_binlog_disabled
 compose --profile tools run --rm communication-migrate
 
-log "预置 50 个团队管理员（凭据只保存在 $SECRETS_DIR/admin_credentials.tsv）"
-compose --profile tools run --rm backend-migrate node backend/dist/provision-beta-admins.js
 
 if [[ "$legacy_postgres_volume" == true ]]; then
   migration_complete="$(compose exec -T mysql sh -ec \
