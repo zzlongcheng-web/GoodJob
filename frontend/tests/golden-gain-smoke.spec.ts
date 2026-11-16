@@ -3,6 +3,9 @@ import { expect, test } from "@playwright/test";
 test("Golden Gain branding, authenticated team management, and staff privacy", async ({ page }) => {
   await page.goto("/");
   await expect(page).toHaveTitle(/Golden Gain/);
+  // Neither the login screen nor logout may silently fill shared credentials.
+  await expect(page.locator("#loginEmail")).toHaveValue("");
+  await expect(page.locator("#loginPassword")).toHaveValue("");
   await page.locator("#loginEmail").fill("alex@goodjob.com");
   await page.locator("#loginPassword").fill("goodjob123");
   await page.locator("#loginButton").click();
@@ -20,6 +23,8 @@ test("Golden Gain branding, authenticated team management, and staff privacy", a
 
   await page.locator("#logoutButton").click();
   await expect(page.locator("body")).not.toHaveClass(/is-authenticated/);
+  await expect(page.locator("#loginEmail")).toHaveValue("");
+  await expect(page.locator("#loginPassword")).toHaveValue("");
   await page.locator("#loginEmail").fill("shirley@goodjob.com");
   await page.locator("#loginPassword").fill("goodjob123");
   await page.locator("#loginButton").click();
