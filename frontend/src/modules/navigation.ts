@@ -365,24 +365,22 @@ const DEFAULT_CREDITS = `<div style="text-align:center;margin-bottom:16px;">
 <p style="font-size:12px;color:var(--text-2,#999);">任何一步失败都会停止更新并保留旧版本；数据库迁移失败也不会继续。点击「确认并继续更新」表示你同意短暂停止本地服务。</p>`;
 
 export async function initSystemUpdate() {
-  const checkBtn = qs<HTMLButtonElement>("#checkUpdateBtn");
-  const applyBtn = qs<HTMLButtonElement>("#applyUpdateBtn");
-  const saveMirrorBtn = qs<HTMLButtonElement>("#saveMirrorBtn");
-
-  if (checkBtn) checkBtn.addEventListener("click", handleCheckUpdate);
-  if (applyBtn) applyBtn.addEventListener("click", handleApplyUpdate);
-  if (saveMirrorBtn) saveMirrorBtn.addEventListener("click", handleSaveMirror);
-
-  // 加载当前镜像源配置和版本
-  try {
-    const config = await api<{ mirrorUrl: string; currentVersion: string }>("/api/admin/updates/config");
-    const mirrorInput = qs<HTMLInputElement>("#mirrorUrlInput");
-    if (mirrorInput) mirrorInput.value = config.mirrorUrl || "";
-    const versionBadge = qs<HTMLElement>("#updateVersionBadge");
-    if (versionBadge) versionBadge.textContent = `v${config.currentVersion}`;
-    const currentVersionEl = qs<HTMLElement>("#updateCurrentVersion");
-    if (currentVersionEl) currentVersionEl.textContent = `v${config.currentVersion}`;
-  } catch { /* 非管理员或未登录 */ }
+  // Golden Gain releases are approved by an operator against a pinned source commit.
+  // Do not fetch external manifests, save mirrors, or allow in-app update actions.
+  for (const id of ["checkUpdateBtn", "applyUpdateBtn", "saveMirrorBtn"]) {
+    const button = qs<HTMLButtonElement>(`#${id}`);
+    if (button) {
+      button.disabled = true;
+      button.title = "Golden Gain 已禁用应用内自动更新，请联系技术管理员";
+    }
+  }
+  const status = qs<HTMLElement>("#updateStatusText");
+  if (status) status.textContent = "已禁用应用内自动更新；仅支持技术管理员核准固定代码版本后部署";
+  const mirrorInput = qs<HTMLInputElement>("#mirrorUrlInput");
+  if (mirrorInput) {
+    mirrorInput.value = "";
+    mirrorInput.disabled = true;
+  }
 }
 
 async function handleCheckUpdate() {
