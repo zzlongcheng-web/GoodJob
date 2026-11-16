@@ -2814,6 +2814,10 @@ function installEvents() {
     localStorage.removeItem(storage.user);
     state.user = null;
     document.body.classList.remove("is-authenticated");
+    const loginEmail = qs<HTMLInputElement>("#loginEmail");
+    const loginPassword = qs<HTMLInputElement>("#loginPassword");
+    if (loginEmail) loginEmail.value = "";
+    if (loginPassword) loginPassword.value = "";
     toast("已退出登录");
   });
   qs<HTMLButtonElement>("#profileEntryButton")?.addEventListener("click", () => activateNavView("profile", () => renderProfile()));
