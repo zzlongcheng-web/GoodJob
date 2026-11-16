@@ -44,13 +44,18 @@ describe("personal WhatsApp ownership", () => {
       .send({ name: "Alice WhatsApp", provider: "baileys", riskAccepted: true })
       .expect(201);
     accountId = created.body.id;
-    const added = await request(runtime.app)
-      .post("/api/v1/contacts")
-      .set(alice)
-      .send({ accountId, displayName: "Alice Only Contact", phone: "+14155550115" })
-      .expect(201);
-    contactId = added.body.contact.id;
-    conversationId = added.body.conversation.id;
+    // Seed a conversation directly: an unconnected Baileys test account cannot
+    // create real provider contacts over HTTP (the API correctly responds 409).
+    const contact = await runtime.repository.upsertContact({
+      accountId,
+      providerContactId: "14155550115@s.whatsapp.net",
+      displayName: "Alice Only Contact",
+      phone: "+14155550115",
+      source: "demo",
+      origin: "whatsapp_sync"
+    });
+    contactId = contact.id;
+    conversationId = (await runtime.repository.ensureConversationForContact(contact.id)).id;
   });
 
   afterAll(async () => runtime.close());
