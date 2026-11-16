@@ -2,7 +2,7 @@ name: GoodJob CRM CI
 
 on:
   push:
-    branches: [master]
+    branches: [master, fix/predeploy-hardening-20261116]
   pull_request:
     branches: [master]
   workflow_dispatch:
