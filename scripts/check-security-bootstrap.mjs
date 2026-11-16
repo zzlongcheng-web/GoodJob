@@ -25,6 +25,7 @@ assert.match(configure, /^ENABLE_API_DOCS=false$/m);
 assert.match(configure, /^GOODJOB_IMAGE_MODE=local$/m);
 assert.doesNotMatch(configure, /crpi-f1g4pi9vyexdaer5\.cn-hongkong\.personal\.cr\.aliyuncs\.com/);
 assert.match(read("deploy/docker-compose/deploy.env.example"), /^GOODJOB_IMAGE_MODE=local$/m);
+assert.match(read("deploy/docker-compose/deploy.env.example"), /^ENABLE_API_DOCS=false$/m);
 assert.doesNotMatch(configure, /DEFAULT_INITIAL_ADMIN_EMAIL|beta-admin-|admin_credentials\.tsv/);
 assert.doesNotMatch(installer, /provision-beta-admins|预置 50 个团队管理员/);
 assert.doesNotMatch(compose, /admin_credentials\.tsv|\s- admin_credentials\s/);
