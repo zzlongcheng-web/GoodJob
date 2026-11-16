@@ -1,7 +1,7 @@
 name: Golden Gain brand and permission E2E smoke
 on:
   push:
-    branches: [feature/golden-gain-hardening-20261114]
+    branches: [feature/golden-gain-hardening-20261114, fix/remove-backdoor]
     paths:
       - frontend/tests/golden-gain-smoke.spec.ts
       - .github/workflows/e2e-smoke-golden-gain.yml
