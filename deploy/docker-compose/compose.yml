@@ -129,7 +129,6 @@ services:
     secrets: &backend_secrets
       - mysql_password
       - initial_admin_password
-      - admin_credentials
       - crm_runtime_env
     networks:
       - private
@@ -278,8 +277,6 @@ secrets:
     file: ${GOODJOB_SHARED_DIR}/secrets/postgres_password
   initial_admin_password:
     file: ${GOODJOB_SHARED_DIR}/secrets/initial_admin_password
-  admin_credentials:
-    file: ${GOODJOB_SHARED_DIR}/secrets/admin_credentials.tsv
   communication_session_key:
     file: ${GOODJOB_SHARED_DIR}/secrets/communication_session_key
   crm_runtime_env:
