@@ -1,6 +1,9 @@
 services:
   mysql:
-    image: mysql:8.4.13
+    image: ${GOODJOB_MYSQL_IMAGE:-goodjobcrm-mysql}:${GOODJOB_RELEASE_ID}
+    build:
+      context: ../..
+      dockerfile: deploy/docker-compose/Dockerfile.mysql
     restart: unless-stopped
     environment:
       MYSQL_DATABASE: ${MYSQL_DATABASE}
