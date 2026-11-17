@@ -29,13 +29,16 @@ RUN apt-get update \
 
 WORKDIR /app
 COPY package.json package-lock.json ./
+COPY vendor vendor
 COPY backend/package.json backend/package.json
 COPY frontend/package.json frontend/package.json
 COPY integration-sdk/package.json integration-sdk/package.json
 COPY integration-worker/package.json integration-worker/package.json
 RUN npm pkg delete --workspace @goodjob/integration-connector-sdk scripts.prepare \
     && npm ci --omit=dev --ignore-scripts --no-audit --no-fund \
-    && npm cache clean --force
+    && npm cache clean --force \
+    && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx \
+       /usr/local/lib/node_modules/corepack /usr/local/bin/corepack
 
 COPY backend/dist backend/dist
 COPY backend/resources backend/resources
