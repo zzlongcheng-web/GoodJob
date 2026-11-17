@@ -86,6 +86,7 @@ jobs:
         run: |
           docker run --rm --mount type=bind,source="$PWD",target=/app --workdir /app \
             --env NODE_ENV=test --env LIBREOFFICE_BIN=/usr/bin/soffice \
+            --env GOODJOB_FILE_ROOT=/tmp/a2-file-storage --env GOODJOB_UPLOADS_DIR=/tmp/a2-uploads \
             --env JWT_SECRET=goodjob-a2-ci-jwt-secret-not-for-production-32-characters \
             --entrypoint sh a2-xlsx-backend:test \
             -ec 'npm run test:trade-document-excel --workspace backend'
