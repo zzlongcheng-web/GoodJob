@@ -1,0 +1,51 @@
+name: Golden Gain dependency evidence (temporary)
+on:
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  dependency-evidence:
+    name: Snapshot complete npm audit JSON and dependency trees
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked root and plugin deps
+        run: |
+          npm ci
+          npm --prefix whatsapp-plugin ci
+      - name: Save original npm audit JSON and npm ls trees (do not edit lockfiles)
+        shell: bash
+        run: |
+          mkdir -p audit/evidence
+          npm audit --json > audit/evidence/root-all.json || true
+          npm audit --omit=dev --json > audit/evidence/root-prod.json || true
+          npm --prefix whatsapp-plugin audit --json > audit/evidence/plugin-all.json || true
+          npm --prefix whatsapp-plugin audit --omit=dev --json > audit/evidence/plugin-prod.json || true
+          npm ls --all > audit/evidence/root-tree.txt 2>&1 || true
+          npm --prefix whatsapp-plugin ls --all > audit/evidence/plugin-tree.txt 2>&1 || true
+          node - <<'NODE'
+          const fs=require('node:fs');
+          for(const kind of ['root-all','root-prod','plugin-all','plugin-prod']){
+            const p='audit/evidence/'+kind+'.json';
+            const j=JSON.parse(fs.readFileSync(p,'utf8'));
+            console.log('AUDIT_SUMMARY '+JSON.stringify({kind,metadata:j.metadata?.vulnerabilities||{},packages:Object.keys(j.vulnerabilities||{}).length}));
+            for(const [name,v] of Object.entries(j.vulnerabilities||{})){
+              if(!['high','critical'].includes(v.severity))continue;
+              console.log('AUDIT_ITEM '+JSON.stringify({kind,name,severity:v.severity,isDirect:v.isDirect,range:v.range,fixAvailable:v.fixAvailable,via:v.via?.filter(x=>typeof x==='object').map(x=>({name:x.name,title:x.title,url:x.url,range:x.range,severity:x.severity}))}));
+            }
+          }
+          NODE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dependency-audit-raw-${{ github.run_id }}
+          path: audit/evidence/
+          if-no-files-found: warn
+          retention-days: 90
