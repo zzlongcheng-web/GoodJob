@@ -29,7 +29,6 @@ RUN apt-get update \
 
 WORKDIR /app
 COPY package.json package-lock.json ./
-COPY vendor vendor
 COPY backend/package.json backend/package.json
 COPY frontend/package.json frontend/package.json
 COPY integration-sdk/package.json integration-sdk/package.json
