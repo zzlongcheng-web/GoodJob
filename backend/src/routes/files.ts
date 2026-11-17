@@ -9,7 +9,7 @@ import express, { type Request, type Response } from "express";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, stat, statfs } from "node:fs/promises";
 import path from "node:path";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { hasIamPermission, requireAuth } from "../auth.js";
 import { getSupplierRepository } from "../supplier-repository.js";
 import { contentDisposition, FILE_CHUNK_BYTES, FILE_MAX_BYTES, getFileRepository, isPreviewable, LocalStorageDriver, type MysqlFileRepository, sanitizeOriginalName, sniffFileType, type StoredFile, UPLOAD_SESSION_MAX_OPEN, UPLOAD_SESSION_TTL_MS } from "../file-storage.js";

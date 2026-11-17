@@ -9,7 +9,7 @@ import express, { type Response } from "express";
 import { randomUUID } from "node:crypto";
 import { mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { canSeeOwner, canSeePersonalData, hasIamPermission, isPlatformIdentity, requireAuth } from "../auth.js";
 import { callAiModel, extractJsonObject } from "../ai-model-runtime.js";
 import { parseCustomerIntakeResult } from "../customer-intake-parse.js";

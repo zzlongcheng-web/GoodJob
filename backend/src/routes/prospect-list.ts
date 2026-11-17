@@ -7,7 +7,7 @@
 import type { Express } from "express";
 import { type Request, type Response } from "express";
 import { createHash, randomUUID } from "node:crypto";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { canSeeOwner, hasIamPermission, requireAuth } from "../auth.js";
 import { getBackgroundResearchRepository } from "../outreach-journey.js";
 import { type ProspectIdentityBootstrapAttempt, type ProspectOutreachChannel, type SessionUser, type WebsiteOpportunity } from "../types.js";

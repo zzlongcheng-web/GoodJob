@@ -5,7 +5,7 @@
  * 共享逻辑与全局中间件在 ../server-core.ts。
  */
 import type { Express } from "express";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { canSeeOwner, canSeePersonalData, requireAuth } from "../auth.js";
 import { type Customer, type Deal, type Todo } from "../types.js";
 import { getStore } from "../store.js";

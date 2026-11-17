@@ -6,7 +6,7 @@
  */
 import type { Express } from "express";
 import { type Response } from "express";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { canSeeOwner, requireAuth } from "../auth.js";
 import { type Lead, type LeadSourceEvent, type SessionUser, type WebsiteOpportunity } from "../types.js";
 import { getStore } from "../store.js";

@@ -5,7 +5,7 @@
  * 共享逻辑与全局中间件在 ../server-core.ts。
  */
 import type { Express } from "express";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { canSeeOwner, hasIamPermission, isPlatformIdentity, requireAuth } from "../auth.js";
 import { AI_ENGINE_ADAPTERS, AI_ENGINE_CLI_EFFORTS, AI_ENGINE_CLI_MODELS, AI_ENGINE_CODEX_EFFORTS, AI_ENGINE_CODEX_MODELS, EMAIL_ENGINE_SOURCES, readTeamAiEngineSettings, RESEARCH_ENGINE_SOURCES, sanitizeTeamAiEngineSettings, writeTeamAiEngineSettings } from "../ai-engine-settings.js";
 import { buildAcquisitionCliPrompt, buildTenderDailyCliPrompt, collectReportedTenderLines, type TenderDailyReport } from "../ai-engine-prompts.js";
