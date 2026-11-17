@@ -50,6 +50,24 @@ jobs:
       - name: Docker compose local image builds
         run: |
           docker compose -f deploy/docker-compose/compose.yml --profile tools build mysql backend-migrate communication-migrate gateway
+      - name: Validate first-install script syntax and secret group contract
+        run: |
+          bash -n deploy/docker-compose/configure.sh
+          bash -n deploy/docker-compose/install.sh
+          grep -F 'chown 0:1001 "$SECRETS_DIR"/*' deploy/docker-compose/configure.sh
+          mkdir -p a2-evidence
+          printf 'secret-smoke-ok\n' > a2-evidence/runtime-test-secret
+          sudo chown 0:1001 a2-evidence/runtime-test-secret
+          chmod 0640 a2-evidence/runtime-test-secret
+          for image in goodjobcrm-backend:a2-ci goodjobcrm-communication:a2-ci; do
+            docker run --rm --mount "type=bind,source=$PWD/a2-evidence/runtime-test-secret,target=/run/secrets/runtime-test-secret,readonly" \
+              --entrypoint sh "$image" -ec '
+                test "$(id -u)" = 1001
+                test "$(id -g)" = 1001
+                test "$(cat /run/secrets/runtime-test-secret)" = secret-smoke-ok
+              '
+          done
+          rm a2-evidence/runtime-test-secret
       - name: Inspect actual backend production image
         run: |
           docker image inspect goodjobcrm-backend:a2-ci --format '{{.Id}}' > a2-evidence/backend-image-id.txt
