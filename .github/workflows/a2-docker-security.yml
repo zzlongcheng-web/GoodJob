@@ -89,6 +89,16 @@ jobs:
           output: a2-evidence/trivy-gateway.json
           severity: HIGH,CRITICAL
           exit-code: '0'
+      - name: Check hardened MySQL runtime has intact server and privilege drop
+        run: |
+          docker run --rm --entrypoint sh goodjobcrm-mysql:a2-ci -ec '
+            command -v mysqld
+            command -v mysqladmin
+            command -v runuser
+            test ! -e /usr/local/bin/gosu
+            test ! -e /usr/lib/mysqlsh
+            grep -F "exec runuser -u mysql --" /usr/local/bin/docker-entrypoint.sh
+          '
       - name: Trivy scan production MySQL image
         uses: aquasecurity/trivy-action@v0.36.0
         with:
