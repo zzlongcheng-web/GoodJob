@@ -744,6 +744,11 @@ export function registerToolsRoutes(app: Express) {
   }));
 
   app.delete("/api/tools/product-categories/:name", requireAuth, asyncRoute(async (req, res) => {
+    // 风险修复：该记录属于公司业务资料，普通业务员不得删除
+    if (req.user!.role === "sales") {
+      res.status(403).json({ message: "业务员不能删除产品分类；请联系主管" });
+      return;
+    }
     const name = normalizeProductCategoryName(req.params.name);
     if (!name) {
       res.status(400).json({ message: "分类名称不能为空" });
@@ -830,6 +835,11 @@ export function registerToolsRoutes(app: Express) {
   }));
 
   app.delete("/api/tools/products/:id", requireAuth, asyncRoute(async (req, res) => {
+    // 风险修复：该记录属于公司业务资料，普通业务员不得删除
+    if (req.user!.role === "sales") {
+      res.status(403).json({ message: "业务员不能删除产品资料；如需下架请联系主管" });
+      return;
+    }
     const store = getStore();
     const index = store.products.findIndex((item) => item.id === req.params.id && canSeeOwner(req.user!, item.ownerId, item.teamId));
     if (index < 0) {
@@ -943,6 +953,11 @@ export function registerToolsRoutes(app: Express) {
   }));
 
   app.delete("/api/tools/shipments/:id", requireAuth, asyncRoute(async (req, res) => {
+    // 风险修复：该记录属于公司业务资料，普通业务员不得删除
+    if (req.user!.role === "sales") {
+      res.status(403).json({ message: "业务员不能删除发货单；发货记录请联系主管处理" });
+      return;
+    }
     const store = getStore();
     const index = store.shipments.findIndex((item) => item.id === req.params.id && item.ownerId === req.user!.id);
     if (index < 0) {

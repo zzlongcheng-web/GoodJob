@@ -594,7 +594,7 @@ try {
     headers: { authorization: `Bearer ${salesToken}` },
     body: JSON.stringify({
       to: "lead.buyer@example.com",
-      subject: "GoodJob 产品资料与报价沟通",
+      subject: "Golden Gain 产品资料与报价沟通",
       body: "Dear Lead Buyer, we would like to confirm your specification and prepare a quotation.",
       nextFollowAt: "后天 10:00"
     })
@@ -690,9 +690,15 @@ try {
   if (!repeatedConversion.response.ok || !repeatedConversion.json.duplicate || repeatedConversion.json.deal?.id !== existingConversion.json.deal.id) {
     throw new Error("lead conversion must be idempotent");
   }
-  const convertedLeadDelete = await request(`/api/leads/${externalLeadFirst.json.lead.id}`, {
+  const salesConvertedLeadDelete = await request(`/api/leads/${externalLeadFirst.json.lead.id}`, {
     method: "DELETE",
     headers: { authorization: `Bearer ${salesToken}` },
+    body: JSON.stringify({ reason: "业务员不得删除线索" })
+  });
+  if (salesConvertedLeadDelete.response.status !== 403) throw new Error("sales must not delete leads");
+  const convertedLeadDelete = await request(`/api/leads/${externalLeadFirst.json.lead.id}`, {
+    method: "DELETE",
+    headers: { authorization: `Bearer ${managerToken}` },
     body: JSON.stringify({ reason: "已完成转化，清理线索工作区" })
   });
   if (!convertedLeadDelete.response.ok || !convertedLeadDelete.json.lead?.deletedAt) {
@@ -703,9 +709,14 @@ try {
   if (!convertedCustomerAfterLeadDelete || !convertedDealAfterLeadDelete) {
     throw new Error("deleting a converted lead must preserve customer and deal");
   }
-  const convertedLeadPermanentDelete = await request(`/api/leads/${externalLeadFirst.json.lead.id}/permanent`, {
+  const salesConvertedPermanent = await request(`/api/leads/${externalLeadFirst.json.lead.id}/permanent`, {
     method: "DELETE",
     headers: { authorization: `Bearer ${salesToken}` }
+  });
+  if (salesConvertedPermanent.response.status !== 403) throw new Error("sales must not permanently delete leads");
+  const convertedLeadPermanentDelete = await request(`/api/leads/${externalLeadFirst.json.lead.id}/permanent`, {
+    method: "DELETE",
+    headers: { authorization: `Bearer ${managerToken}` }
   });
   if (convertedLeadPermanentDelete.response.status !== 400) {
     throw new Error("converted lead source record must not be permanently deleted");
@@ -738,14 +749,14 @@ try {
 
   const leadTrash = await request(`/api/leads/${testLeadId}`, {
     method: "DELETE",
-    headers: { authorization: `Bearer ${salesToken}` },
+    headers: { authorization: `Bearer ${managerToken}` },
     body: JSON.stringify({ reason: "自测移入垃圾箱" })
   });
   if (
     !leadTrash.response.ok
     || !leadTrash.json.lead?.deletedAt
     || leadTrash.json.lead.deletedReason !== "自测移入垃圾箱"
-    || leadTrash.json.lead.deletedBy !== "u_sales_shirley"
+    || leadTrash.json.lead.deletedBy !== getStore().users.find((user) => user.email === "alex@goodjob.com")?.id
     || !leadTrash.json.lead.purgeAt
     || leadTrash.json.lead.statusBeforeDelete !== testLeadOriginalStatus
   ) {
@@ -773,13 +784,13 @@ try {
   }
   const leadTrashAgain = await request(`/api/leads/${testLeadId}`, {
     method: "DELETE",
-    headers: { authorization: `Bearer ${salesToken}` },
+    headers: { authorization: `Bearer ${managerToken}` },
     body: JSON.stringify({ reason: "自测永久删除前再次移入垃圾箱" })
   });
   if (!leadTrashAgain.response.ok || !leadTrashAgain.json.lead?.deletedAt) throw new Error("lead second trash failed");
   const leadPermanentDelete = await request(`/api/leads/${testLeadId}/permanent`, {
     method: "DELETE",
-    headers: { authorization: `Bearer ${salesToken}` }
+    headers: { authorization: `Bearer ${managerToken}` }
   });
   if (!leadPermanentDelete.response.ok || !leadPermanentDelete.json.ok || leadPermanentDelete.json.sourceEventsDeleted < 1) {
     throw new Error("lead permanent delete and source event cleanup failed");
@@ -2840,14 +2851,27 @@ try {
     })
   });
   if (!customerImport.response.ok || customerImport.json.result.created !== 1 || customerImport.json.result.updated !== 1) throw new Error("customer import failed");
-  const customerExport = await request("/api/import-export/customers/export", {
+  const salesExportDenied = await request("/api/import-export/customers/export", {
     method: "POST",
     headers: { authorization: `Bearer ${salesToken}` }
   });
+  if (salesExportDenied.response.status !== 403) throw new Error("sales must not export customers");
+  const customerExport = await request("/api/import-export/customers/export", {
+    method: "POST",
+    headers: { authorization: `Bearer ${managerToken}` }
+  });
   if (!customerExport.response.ok || !Array.isArray(customerExport.json.customers) || customerExport.json.customers.length < 1) throw new Error("customer export failed");
-  if (!customerExport.json.customers.some((customer: { whatsapp?: string }) => customer.whatsapp === "+4915212345678")) throw new Error("customer WhatsApp import/export failed");
-  if (!customerExport.json.customers.some((customer: { whatsapp?: string; lifecycleStatus?: string; hasWonDeal?: boolean; wonDealCount?: number }) => customer.whatsapp === "+4915212345678" && customer.lifecycleStatus === "won" && customer.hasWonDeal === true && customer.wonDealCount === 0)) throw new Error("imported won customer must not depend on a deal");
-  if (!customerExport.json.customers.some((customer: { whatsapp?: string; source?: string; companyFullName?: string; id?: string }) => customer.whatsapp === "+4915212345678" && customer.source === "展会名片" && customer.companyFullName === "Automation Import Customer GmbH" && customer.id)) throw new Error("customer source/name/id import/export failed");
+  // WhatsApp 号码属于负责人的个人数据：负责人（业务员）导入时返回的客户能看到；主管导出的客户清单不应暴露该号码。
+  const importedSelf = customerImport.json.imported as Array<{ id?: string; whatsapp?: string; lifecycleStatus?: string; hasWonDeal?: boolean; wonDealCount?: number; source?: string; companyFullName?: string }>;
+  const importedWhatsappCustomer = importedSelf.find((customer) => customer.whatsapp === "+4915212345678");
+  if (!importedWhatsappCustomer) throw new Error("customer WhatsApp import failed");
+  if (!(importedWhatsappCustomer.lifecycleStatus === "won" && importedWhatsappCustomer.hasWonDeal === true && importedWhatsappCustomer.wonDealCount === 0)) throw new Error("imported won customer must not depend on a deal");
+  if (!(importedWhatsappCustomer.source === "展会名片" && importedWhatsappCustomer.companyFullName === "Automation Import Customer GmbH" && importedWhatsappCustomer.id)) throw new Error("customer source/name/id import failed");
+  const exportedImported = (customerExport.json.customers as Array<{ id?: string; whatsapp?: string; whatsappPhone?: string; source?: string; companyFullName?: string }>)
+    .find((customer) => customer.id === importedWhatsappCustomer.id);
+  if (!exportedImported) throw new Error("manager export must include the team's imported customer");
+  if (exportedImported.source !== "展会名片" || exportedImported.companyFullName !== "Automation Import Customer GmbH") throw new Error("manager export must keep customer source and name");
+  if (exportedImported.whatsapp || exportedImported.whatsappPhone) throw new Error("manager export must not expose the owner's personal WhatsApp number");
 
   const oversizedTradeDocument = await request("/api/trade-documents", {
     method: "POST",
@@ -2857,7 +2881,7 @@ try {
       title: "X".repeat(256),
       number: "PI-LENGTH-CHECK",
       issueDate: "2026-07-24",
-      seller: "GoodJob Trading Test Co., Ltd.",
+      seller: "Golden Gain Trading Test Co., Ltd.",
       items: [{ product: "Length validation", quantity: 1, unitPrice: 1 }]
     })
   });
@@ -2876,7 +2900,7 @@ try {
       buyer: "Automation Buyer Ltd.",
       buyerAddress: "Berlin, Germany",
       buyerContact: "Auto Buyer",
-      seller: "GoodJob Trading Test Co., Ltd.",
+      seller: "Golden Gain Trading Test Co., Ltd.",
       sellerAddress: "Shanghai, China",
       currency: "USD",
       incoterm: "FOB",

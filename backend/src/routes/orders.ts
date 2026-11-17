@@ -862,6 +862,11 @@ export function registerOrdersRoutes(app: Express) {
   }));
 
   app.delete("/api/orders/:id/files/:fileId", requireAuth, asyncRoute(async (req, res) => {
+    // 风险修复：该记录属于公司业务资料，普通业务员不得删除
+    if (req.user!.role === "sales") {
+      res.status(403).json({ message: "业务员不能删除订单附件；如有错误请联系主管" });
+      return;
+    }
     const store = getStore();
     const order = store.orders.find((item) => item.id === req.params.id);
     if (!order || !orderVisible(req.user!, order)) {

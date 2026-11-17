@@ -18,6 +18,7 @@ import {
 } from "../lead-assignment.js";
 import { type Customer, type Deal, type Lead, type SessionUser } from "../types.js";
 import { getStore } from "../store.js";
+import { MAX_BATCH_LEADS, parseLeadText, splitLeadBlocks, type ParsedLeadText } from "../lead-text-parser.js";
 import { readWebsiteLeadIngressSettings } from "../website-lead-ingress-settings.js";
 import { PROSPECT_LEAD_SOURCE_CHANNEL } from "../prospect-lead-conversion.js";
 import { isPublicCustomer } from "../customer-public-pool.js";
@@ -143,6 +144,26 @@ function findCustomerMatches(user: SessionUser, lead: Lead) {
     })
     .filter((match) => match.score > 0)
     .sort((left, right) => right.score - left.score);
+}
+
+/** 把识别结果（可带业务员修正）变成可入库的线索字段；原文完整保存在 inquiryContent。 */
+function leadInputFromParsed(parsed: ParsedLeadText, raw: string) {
+  const remarkParts = [
+    parsed.whatsapp ? `WhatsApp：${parsed.whatsapp}` : "",
+    parsed.website ? `网站：${parsed.website}` : ""
+  ].filter(Boolean);
+  return leadWritableSchema.parse({
+    company: parsed.company.trim(),
+    contact: parsed.contact,
+    country: parsed.country,
+    email: parsed.email,
+    phone: parsed.phone || parsed.whatsapp,
+    wechat: parsed.wechat,
+    source: "粘贴识别",
+    sourceChannel: "paste",
+    remark: remarkParts.join("；"),
+    inquiryContent: raw.slice(0, 20_000)
+  });
 }
 
 export function registerLeadsRoutes(app: Express) {
@@ -351,6 +372,134 @@ export function registerLeadsRoutes(app: Express) {
     });
   }));
 
+  // 业务员把客户信息（名片/聊天/询盘邮件文字）粘贴进来，系统自动识别成线索字段。
+  // save=false（默认）只返回识别草稿，业务员核对后用 save=true 入库；入库同样会查重，且原文保存在 inquiryContent。
+  app.post("/api/leads/parse-text", requireAuth, asyncRoute(async (req, res) => {
+    const body = z.object({
+      text: z.string().trim().min(5, "请粘贴客户信息").max(20_000),
+      save: z.boolean().optional().default(false),
+      overrides: z.object({
+        company: z.string().trim().max(200).optional(),
+        contact: z.string().trim().max(120).optional(),
+        country: z.string().trim().max(80).optional(),
+        email: z.string().trim().max(254).optional(),
+        phone: z.string().trim().max(60).optional(),
+        wechat: z.string().trim().max(80).optional()
+      }).optional().default({})
+    }).parse(req.body);
+    const parsed = parseLeadText(body.text);
+    if (!body.save) {
+      res.json({ draft: parsed });
+      return;
+    }
+    const merged = { ...parsed, ...Object.fromEntries(Object.entries(body.overrides).filter(([, value]) => value)) } as typeof parsed;
+    const company = merged.company.trim();
+    if (!company) {
+      res.status(400).json({ message: "没有识别出公司名称，请补充公司名称后再保存", draft: parsed });
+      return;
+    }
+    if (!merged.email && !merged.phone && !merged.whatsapp && !merged.wechat) {
+      res.status(400).json({ message: "没有识别出任何联系方式（邮箱/电话/WhatsApp/微信），请补充后再保存", draft: parsed });
+      return;
+    }
+    const store = getStore();
+    const duplicate = findDuplicateLead(store, req.user!.teamId, company, merged.country);
+    if (duplicate) {
+      res.status(409).json({
+        message: `线索已存在：「${duplicate.company}」（${duplicate.country || "国家未知"}）已在线索列表中，不能重复添加`,
+        errorCode: "LEAD_DUPLICATE",
+        existingId: duplicate.id
+      });
+      return;
+    }
+    const remarkParts = [
+      merged.whatsapp ? `WhatsApp：${merged.whatsapp}` : "",
+      merged.website ? `网站：${merged.website}` : ""
+    ].filter(Boolean);
+    const input = leadWritableSchema.parse({
+      company,
+      contact: merged.contact,
+      country: merged.country,
+      email: merged.email,
+      phone: merged.phone || merged.whatsapp,
+      wechat: merged.wechat,
+      source: "粘贴识别",
+      sourceChannel: "paste",
+      remark: remarkParts.join("；"),
+      inquiryContent: body.text
+    });
+    const { lead, sourceEvent, duplicate: sourceDuplicate } = createLeadFromSource(req.user!, input);
+    await store.persist();
+    res.json({ lead, sourceEvent, duplicate: sourceDuplicate, draft: parsed });
+  }));
+
+  // 批量：一次粘贴 10～50 家客户的整段文字，系统自动拆分、逐家识别、查重。
+  // save=false：返回逐家核对清单；save=true：只录入 status=ready 的（可用 indexes 指定其中几家，overrides 按序号修正字段）。
+  app.post("/api/leads/parse-batch", requireAuth, asyncRoute(async (req, res) => {
+    const body = z.object({
+      text: z.string().trim().min(5, "请粘贴客户信息").max(100_000),
+      save: z.boolean().optional().default(false),
+      indexes: z.array(z.number().int().min(1).max(MAX_BATCH_LEADS)).max(MAX_BATCH_LEADS).optional(),
+      overrides: z.record(z.string(), z.object({
+        company: z.string().trim().max(200).optional(),
+        contact: z.string().trim().max(120).optional(),
+        country: z.string().trim().max(80).optional(),
+        email: z.string().trim().max(254).optional(),
+        phone: z.string().trim().max(60).optional(),
+        wechat: z.string().trim().max(80).optional()
+      })).optional().default({})
+    }).parse(req.body);
+    const blocks = splitLeadBlocks(body.text);
+    if (blocks.length > MAX_BATCH_LEADS) {
+      res.status(400).json({ message: `一次最多识别 ${MAX_BATCH_LEADS} 家，当前识别到 ${blocks.length} 家，请分批粘贴` });
+      return;
+    }
+    const store = getStore();
+    const seen = new Set<string>();
+    const items = blocks.map((raw, i) => ({ index: i + 1, raw, draft: parseLeadText(raw) }));
+    const rows = items.map((item) => {
+      const override = Object.fromEntries(Object.entries(body.overrides[String(item.index)] || {}).filter(([, v]) => v));
+      const draft = { ...item.draft, ...override } as ParsedLeadText;
+      const hasContact = Boolean(draft.email || draft.phone || draft.whatsapp || draft.wechat);
+      const issues: string[] = [];
+      if (!draft.company.trim()) issues.push("缺少公司名称");
+      if (!hasContact) issues.push("缺少联系方式");
+      let status: "ready" | "needs_fix" | "duplicate" = issues.length ? "needs_fix" : "ready";
+      let existingId = "";
+      if (!issues.length) {
+        const existing = findDuplicateLead(store, req.user!.teamId, draft.company.trim(), draft.country);
+        const key = `${draft.company.trim().toLowerCase()}|${draft.country}`;
+        const emailKey = draft.email ? `e:${draft.email}` : "";
+        if (existing) { status = "duplicate"; existingId = existing.id; issues.push("系统中已存在该线索"); }
+        else if (seen.has(key) || (emailKey && seen.has(emailKey))) { status = "duplicate"; issues.push("本次粘贴内容中重复"); }
+        seen.add(key);
+        if (emailKey) seen.add(emailKey);
+      }
+      return { index: item.index, raw: item.raw, draft, status, issues, existingId };
+    });
+    if (!body.save) {
+      res.json({
+        total: rows.length,
+        ready: rows.filter((r) => r.status === "ready").length,
+        needsFix: rows.filter((r) => r.status === "needs_fix").length,
+        duplicate: rows.filter((r) => r.status === "duplicate").length,
+        items: rows
+      });
+      return;
+    }
+    const chosen = body.indexes ? new Set(body.indexes) : null;
+    const created: Array<{ index: number; leadId: string; company: string }> = [];
+    const skipped: Array<{ index: number; company: string; reason: string }> = [];
+    for (const row of rows) {
+      if (chosen && !chosen.has(row.index)) { skipped.push({ index: row.index, company: row.draft.company, reason: "未选中" }); continue; }
+      if (row.status !== "ready") { skipped.push({ index: row.index, company: row.draft.company, reason: row.issues.join("；") }); continue; }
+      const { lead } = createLeadFromSource(req.user!, leadInputFromParsed(row.draft, row.raw));
+      created.push({ index: row.index, leadId: lead.id, company: lead.company });
+    }
+    if (created.length) await store.persist();
+    res.json({ total: rows.length, created, skipped });
+  }));
+
   app.post("/api/leads", requireAuth, asyncRoute(async (req, res) => {
     const body = leadWritableSchema.parse(req.body);
     const store = getStore();
@@ -390,6 +539,23 @@ export function registerLeadsRoutes(app: Express) {
       res.status(404).json({ message: "线索不存在或无权访问" });
       return;
     }
+    // 业务员不能删线索，但可以标记“无效”：必须写明原因（备注），留下可核查的记录
+    if (body.status === "invalid" && lead.status !== "invalid") {
+      const reason = String(body.remark ?? "").trim();
+      if (reason.length < 2) {
+        res.status(400).json({ message: "标记线索无效必须在备注中写明原因" });
+        return;
+      }
+      store.leadActivities.unshift({
+        id: `la_${randomUUID()}`,
+        leadId: lead.id,
+        type: "note",
+        content: `标记为无效：${reason}`,
+        operatorId: req.user!.id,
+        nextFollowAt: "",
+        createdAt: new Date().toISOString()
+      });
+    }
     const previousStage = lead.stage;
     Object.assign(lead, body);
     lead.lastActivityAt = "刚刚";
@@ -415,6 +581,10 @@ export function registerLeadsRoutes(app: Express) {
     const lead = store.leads.find((item) => item.id === req.params.id);
     if (!lead || !canSeeOwner(req.user!, lead.ownerId, lead.teamId)) {
       res.status(404).json({ message: "线索不存在或无权访问" });
+      return;
+    }
+    if (req.user!.role === "sales" || !hasIamPermission(req.user!, "lead.delete")) {
+      res.status(403).json({ message: "普通业务员不能删除线索；请把线索标记为“无效”并写明原因，或联系主管处理" });
       return;
     }
     if (lead.deletedAt) {
@@ -480,6 +650,10 @@ export function registerLeadsRoutes(app: Express) {
     const lead = store.leads.find((item) => item.id === req.params.id);
     if (!lead || !canSeeOwner(req.user!, lead.ownerId, lead.teamId)) {
       res.status(404).json({ message: "线索不存在或无权访问" });
+      return;
+    }
+    if (req.user!.role === "sales" || !hasIamPermission(req.user!, "lead.delete")) {
+      res.status(403).json({ message: "普通业务员不能永久删除线索；请联系主管处理" });
       return;
     }
     if (!lead.deletedAt) {

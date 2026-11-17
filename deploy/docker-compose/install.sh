@@ -81,8 +81,13 @@ compose --profile tools run --rm backend-migrate
 assert_mysql_binlog_disabled
 compose --profile tools run --rm communication-migrate
 
-log "预置 50 个团队管理员（凭据只保存在 $SECRETS_DIR/admin_credentials.tsv）"
-compose --profile tools run --rm backend-migrate node backend/dist/provision-beta-admins.js
+# 安全修复：默认不再创建 50 个 beta-admin 测试管理员账号；仅在明确需要时设置 GOODJOB_PROVISION_BETA_ADMINS=true
+if [[ "${GOODJOB_PROVISION_BETA_ADMINS:-false}" == "true" ]]; then
+  log "预置 50 个团队管理员（凭据只保存在 $SECRETS_DIR/admin_credentials.tsv）"
+  compose --profile tools run --rm backend-migrate node backend/dist/provision-beta-admins.js
+else
+  log "跳过预置 beta-admin 测试管理员（只使用 INITIAL_ADMIN_EMAIL 超级管理员）"
+fi
 
 if [[ "$legacy_postgres_volume" == true ]]; then
   migration_complete="$(compose exec -T mysql sh -ec \

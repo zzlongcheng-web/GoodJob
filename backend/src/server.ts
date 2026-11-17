@@ -1,5 +1,5 @@
 /**
- * GoodJob CRM API 入口。
+ * Golden Gain CRM API 入口。
  *
  * - server-core.ts：应用实例、全局中间件/权限闸、共享辅助函数与运行时状态
  * - routes/*.ts：按业务域拆分的路由，下方按原 server.ts 的顺序注册

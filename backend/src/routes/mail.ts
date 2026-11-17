@@ -581,8 +581,8 @@ export function registerMailRoutes(app: Express) {
     try {
       const info = await sendOutboundEmail(user, {
         to: testTo,
-        subject: "GoodJob CRM SMTP 测试邮件",
-        body: `这是一封来自 GoodJob CRM 的 SMTP 测试邮件。\n\n账号：${user.email}\n时间：${new Date().toISOString()}`
+        subject: "Golden Gain CRM SMTP 测试邮件",
+        body: `这是一封来自 Golden Gain CRM 的 SMTP 测试邮件。\n\n账号：${user.email}\n时间：${new Date().toISOString()}`
       });
       res.json({ ok: true, to: testTo, messageId: info.messageId, simulated: process.env.NODE_ENV === "test" });
     } catch (error) {
@@ -657,8 +657,8 @@ export function registerMailRoutes(app: Express) {
     try {
       const info = await sendOutboundEmail({ ...user, ...senderMailboxOverrides(mailbox) }, {
         to: testTo,
-        subject: "GoodJob CRM 发件邮箱池测试邮件",
-        body: `这是一封来自 GoodJob CRM 发件邮箱池的测试邮件。\n\n发件邮箱：${mailbox.email}\n账号：${user.email}\n时间：${new Date().toISOString()}`
+        subject: "Golden Gain CRM 发件邮箱池测试邮件",
+        body: `这是一封来自 Golden Gain CRM 发件邮箱池的测试邮件。\n\n发件邮箱：${mailbox.email}\n账号：${user.email}\n时间：${new Date().toISOString()}`
       });
       res.json({ ok: true, to: testTo, messageId: info.messageId, simulated: process.env.NODE_ENV === "test" });
     } catch (error) {

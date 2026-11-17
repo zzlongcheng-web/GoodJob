@@ -816,6 +816,13 @@ export function registerCommunicationRoutes(app: Express) {
       res.status(403).json({ message: "无权访问该消息" });
       return;
     }
+    // 风险修复：沟通记录是考核证据，默认任何人都不能物理删除；管理员设 GOODJOB_ALLOW_MESSAGE_DELETE=true 才临时开启（且仍需主管权限）
+    if (process.env.GOODJOB_ALLOW_MESSAGE_DELETE !== "true" || req.user!.role !== "admin" || !hasIamPermission(req.user!, "customer.activity.delete")) {
+      console.warn(`[audit] whatsapp message delete BLOCKED id=${message.id} by=${req.user!.id}`);
+      res.status(403).json({ message: "沟通记录不可删除；如有错误，请新增更正记录或联系管理员" });
+      return;
+    }
+    console.warn(`[audit] whatsapp message deleted id=${message.id} customer=${message.customerId} by=${req.user!.id}`);
     store.whatsappMessages = store.whatsappMessages.filter((m) => m.id !== message.id);
     await store.persist();
     res.json({ ok: true, id: message.id });
