@@ -30,10 +30,9 @@ jobs:
           npm ci --no-audit --no-fund
           npm --prefix whatsapp-plugin ci --no-audit --no-fund
           npm install --save-exact -w integration-worker \
-            @modelcontextprotocol/client@2.4.0 \
-            @modelcontextprotocol/node@2.1.2 \
-            @modelcontextprotocol/server@2.4.0 \
-            mysql2@3.24.6 zod@4.6.7
+            @modelcontextprotocol/client@2.4.0 mysql2@3.24.6 zod@4.6.7
+          npm install --save-exact -D -w integration-worker \
+            @modelcontextprotocol/node@2.1.2 @modelcontextprotocol/server@2.4.0
           npm install -w backend 'mysql2@^3.24.6'
           npm install -D -w frontend 'vite@^6.4.3'
           npm install --package-lock-only --ignore-scripts --no-audit --no-fund
