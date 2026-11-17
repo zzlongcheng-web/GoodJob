@@ -7,7 +7,7 @@
 import type { Express } from "express";
 import { type Request, type Response } from "express";
 import { randomUUID } from "node:crypto";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { canSeeOwner, hasIamPermission, isPlatformIdentity, requireAuth } from "../auth.js";
 import { emptyEventCounts, getResourceHubRepository, knowledgeAssetTeamId } from "../resource-hub.js";
 import { getKnowledgeGovernanceRepository, normalizeVocabularyValue } from "../knowledge-governance.js";

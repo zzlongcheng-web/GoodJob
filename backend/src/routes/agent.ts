@@ -7,7 +7,7 @@
 import type { Express } from "express";
 import { type Request, type Response } from "express";
 import { randomUUID } from "node:crypto";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { canSeeOwner, hasIamPermission, requireAuth } from "../auth.js";
 import { compileAgentGoalSpec } from "../agent-goal.js";
 import { resolveAgentMissionRoute } from "../agent-turn-decision.js";

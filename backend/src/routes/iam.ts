@@ -7,7 +7,7 @@
 import type { Express } from "express";
 import { type Request, type Response } from "express";
 import { randomBytes } from "node:crypto";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { canManageAccount, canManageAccounts, canManageRole, canSeeOwner, hashPassword, publicUser, requireAuth } from "../auth.js";
 import { AccessControlOverviewError, buildAccessControlOverview } from "../access-control-overview.js";
 import { type CrmStore, getStore } from "../store.js";

@@ -8,7 +8,7 @@ import { engineCliProfile, otherAiEngineAdapter, readTeamAiEngineSettings } from
 import { applyCliProfileToPrompt } from "../ai-engine-service.js";
 import type { Express } from "express";
 import { createHash, randomUUID } from "node:crypto";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { canSeeOwner, requireAuth } from "../auth.js";
 import { callAiModel, extractJsonObject } from "../ai-model-runtime.js";
 import { aiWebSearchPolicy, webSearchFailureSuggestion } from "../ai-web-search-policy.js";
