@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import rateLimit from "express-rate-limit";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { getLocalRunnerService } from "./integration-runtime.js";
 
 const agentRouter = Router();

@@ -1,7 +1,7 @@
 import mysql from "mysql2/promise";
 import { createHash, randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
-import { z } from "zod";
+import { z } from "zod/v3";
 import {
   isProspectRunBridgeJob,
   recoverInterruptedAgentJobs
