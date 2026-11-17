@@ -45,7 +45,16 @@ curl -fsS http://127.0.0.1:4188/api/health
    PUBLIC_ORIGIN=https://crm.example.com
    SESSION_COOKIE_SECURE=true
    ```
-   用实际域名替换示例值，然后执行 `sudo bash /opt/Golden-Gain-CRM/deploy/docker-compose/manage.sh restart`。在 HTTPS 之前不要输入正式业务数据。
+   用实际域名替换示例值。注意 `docker compose restart` 不会重新载入环境变量！请在服务器上执行下面的容器重建（不删除任何数据卷），再核对网站 HTTPS：
+   ```bash
+   RELEASE_ID="$(sudo cat /opt/goodjobcrm/shared/state/current-release)"
+   cd /opt/Golden-Gain-CRM
+   sudo env GOODJOB_RELEASE_ID="$RELEASE_ID" docker compose --project-name goodjobcrm \
+     --env-file /opt/goodjobcrm/shared/deploy.env \
+     -f deploy/docker-compose/compose.yml \
+     up -d --no-build --force-recreate backend communication gateway
+   ```
+   最简单的方式是 **先配置 Nginx 和 HTTPS，再运行 configure.sh，并如实选择已启用 HTTPS**，这样无需修改配置。正式 SSL 生效前不要输入客户资料。
 5. 只通过 `https://crm.example.com` 登录，管理员必须更改密码、配置 MFA。初始管理员邮箱必须是公司自己的邮箱。
 
 ## 首轮试用任务
