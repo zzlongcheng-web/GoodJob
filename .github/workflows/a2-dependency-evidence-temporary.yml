@@ -41,6 +41,7 @@ jobs:
           JS
       - name: Confirm frozen production tree excludes browser packages
         run: |
+          npm pkg delete --workspace @goodjob/integration-connector-sdk scripts.prepare
           npm ci --omit=dev --ignore-scripts --no-audit --no-fund
           node - <<'JS'
           const fs=require('node:fs'), cp=require('node:child_process');
