@@ -6,7 +6,7 @@ FROM ubuntu:24.04
 COPY --from=node-runtime /usr/local/ /usr/local/
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libstdc++6 libgcc-s1 ca-certificates && \
-    groupadd --gid 1000 node && useradd --uid 1000 --gid node --create-home --shell /bin/sh node && \
+    groupadd --gid 1001 node && useradd --uid 1001 --gid node --create-home --shell /bin/sh node && \
     rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production HOME=/home/node
