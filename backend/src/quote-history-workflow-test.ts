@@ -41,7 +41,7 @@ function documentBody(unitPrice = 125) {
     buyer: "Nordic Tools AB",
     buyerAddress: "Stockholm, Sweden",
     buyerContact: "Emma",
-    seller: "GoodJob Export Limited",
+    seller: "Golden Gain Machinery",
     sellerAddress: "Hong Kong",
     currency: "EUR",
     incoterm: "FOB",

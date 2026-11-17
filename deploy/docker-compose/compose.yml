@@ -7,7 +7,7 @@ services:
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD_FILE: /run/secrets/mysql_password
       MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_root_password
-      TZ: Asia/Shanghai
+      TZ: ${GOODJOB_TZ:-Asia/Shanghai}
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
@@ -51,7 +51,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DATABASE:-goodjobcrm_whatsapp_prod}
       POSTGRES_USER: ${POSTGRES_USER:-goodjobcrm_whatsapp_app}
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
-      TZ: Asia/Shanghai
+      TZ: ${GOODJOB_TZ:-Asia/Shanghai}
     command:
       - postgres
       - -c
@@ -103,7 +103,7 @@ services:
       WHATSAPP_PLUGIN_PORT: "3100"
       CORS_ORIGINS: ${PUBLIC_ORIGIN}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE}
-      ENABLE_API_DOCS: ${ENABLE_API_DOCS:-true}
+      ENABLE_API_DOCS: ${ENABLE_API_DOCS:-false}
       INBOUND_MAIL_ENABLED: "true"
       INBOUND_MAIL_POLL_MS: "120000"
       INBOUND_MAIL_LOOKBACK_DAYS: "7"

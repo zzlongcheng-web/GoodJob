@@ -14,7 +14,8 @@ const actor = (role: SessionUser["role"]): SessionUser => ({
 
 const sales = buildLegacyCapabilitySnapshot(actor("sales"));
 assert.ok(sales.permissions["customer.read"]?.includes("self"));
-assert.ok(sales.permissions["customer.export"]?.includes("self"));
+assert.equal(sales.permissions["customer.export"], undefined);
+assert.equal(sales.permissions["deal.delete"], undefined);
 assert.ok(sales.permissions["customer.pool.claim"]?.includes("public_pool"));
 
 const manager = buildLegacyCapabilitySnapshot(actor("manager"));

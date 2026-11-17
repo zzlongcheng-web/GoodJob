@@ -464,7 +464,7 @@ function buildCustomerWorkbookBuffer(company: string) {
   return Buffer.from(XLSX.write(workbook, { bookType: "xlsx", type: "buffer" }));
 }
 
-test.describe("GoodJob CRM prototype pages", () => {
+test.describe("Golden Gain CRM prototype pages", () => {
   let runId: string;
 
   test.beforeEach(async ({ page }) => {
@@ -1252,7 +1252,7 @@ test.describe("GoodJob CRM prototype pages", () => {
     await page.reload();
     await expect(page.locator("body")).toHaveClass(/is-authenticated/);
     await openView(page, "settings");
-    await page.locator("#companyProfileName").fill("GoodJob Export Ltd.");
+    await page.locator("#companyProfileName").fill("Golden Gain Machinery");
     await page.locator("#companyProfileWebsite").fill("https://goodjob.example.com");
     await page.locator("#companyProfileEmail").fill("sales@goodjob.example.com");
     await page.locator("#companyProfileProducts").fill("industrial lighting and export sourcing solutions");
@@ -1756,7 +1756,7 @@ test.describe("GoodJob CRM prototype pages", () => {
     const downloadPromise = page.waitForEvent("download");
     await page.locator("#exportCustomersButton").click();
     const download = await downloadPromise;
-    expect(download.suggestedFilename()).toContain("GoodJob客户清单");
+    expect(download.suggestedFilename()).toContain("Golden Gain客户清单");
     await expect(page.locator("#imports tbody")).toContainText("客户清单导出");
   });
 
@@ -3936,7 +3936,7 @@ test.describe("GoodJob CRM prototype pages", () => {
     const downloadPromise = page.waitForEvent("download");
     await page.locator("#reportExportButton").click();
     const download = await downloadPromise;
-    expect(download.suggestedFilename()).toContain("GoodJob-CRM");
+    expect(download.suggestedFilename()).toContain("Golden Gain-CRM");
     const downloadPath = await download.path();
     expect(downloadPath).not.toBeNull();
     const exportText = await readFile(downloadPath!, "utf8");
