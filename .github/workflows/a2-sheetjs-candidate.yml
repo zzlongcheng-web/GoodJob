@@ -1,0 +1,96 @@
+name: A2 official SheetJS vendor candidate (read-only)
+on:
+  push:
+    branches: [deps/a2-validation-hardening-20261117]
+permissions:
+  contents: read
+jobs:
+  sheetjs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 110
+    env:
+      CI: 'true'
+      NODE_ENV: test
+      JWT_SECRET: goodjob-a2-ci-jwt-secret-not-for-production-32-characters
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Obtain and verify official fixed package
+        run: |
+          set -euo pipefail
+          mkdir -p vendor a2-evidence
+          curl -fL --retry 3 --connect-timeout 20 --max-time 180 \
+            -o vendor/xlsx-0.20.3.tgz https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz
+          sha256sum vendor/xlsx-0.20.3.tgz | tee vendor/xlsx-0.20.3.tgz.sha256
+          tar -xzOf vendor/xlsx-0.20.3.tgz package/package.json > a2-evidence/upstream-xlsx-package.json
+          node - <<'JS'
+          const p=require('./a2-evidence/upstream-xlsx-package.json');
+          if(p.name!=='xlsx'||p.version!=='0.20.3')throw Error('Unexpected package identity');
+          console.log('Official tgz verified:',p.name,p.version,p.license);
+          JS
+      - name: Generate precise local dependency candidate
+        run: |
+          node - <<'JS'
+          const fs=require('node:fs');
+          for(const workspace of ['frontend','backend']){
+            const file=workspace+'/package.json';
+            const p=JSON.parse(fs.readFileSync(file,'utf8'));
+            p.dependencies.xlsx='file:../vendor/xlsx-0.20.3.tgz';
+            fs.writeFileSync(file,JSON.stringify(p,null,2)+'\n');
+          }
+          const file='backend/src/trade-document-import.ts';
+          let s=fs.readFileSync(file,'utf8');
+          const before='import XLSX from "xlsx-js-style";';
+          if(s.split(before).length!==2)throw Error('Expected unique unsafe import');
+          s=s.replace(before,'import * as XLSX from "xlsx";');
+          fs.writeFileSync(file,s);
+          JS
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          npm ci --no-audit --no-fund
+          npm --prefix whatsapp-plugin ci --no-audit --no-fund
+      - name: Verify ESM parser interface and prototype pollution regression
+        run: |
+          node --input-type=module - <<'JS'
+          import * as XLSX from 'xlsx';
+          import { readFileSync } from 'node:fs';
+          if(typeof XLSX.read!=='function')throw Error('ESM XLSX.read is not a function');
+          const wb=XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['__proto__','polluted'],['value','yes']]),'Test');
+          const bytes=XLSX.write(wb,{type:'buffer',bookType:'xlsx'});
+          const reloaded=XLSX.read(bytes,{type:'buffer'});
+          if(!reloaded.SheetNames.length||({}).polluted!==undefined)throw Error('Workbook/prototype regression');
+          console.log('ESM import, workbook roundtrip and prototype smoke passed');
+          JS
+          npm ls xlsx xlsx-js-style > a2-evidence/xlsx-dependency-tree.txt || true
+      - name: Build and critical trade document regressions
+        run: |
+          npm run build
+          npm run test:trade-document-import --workspace backend
+          npm run test:trade-document-excel --workspace backend
+          npm test
+      - name: Confirm production install can access vendored tarball
+        run: |
+          sed -i '/^COPY package.json package-lock.json .\//a COPY vendor vendor' deploy/docker-compose/Dockerfile.backend
+          docker build -f deploy/docker-compose/Dockerfile.backend -t a2-xlsx-backend:test .
+          docker run --rm --entrypoint node a2-xlsx-backend:test -e "const p=require('./node_modules/xlsx/package.json'); if(p.version!=='0.20.3')process.exit(1); console.log('Vendored production xlsx',p.version)"
+      - name: Audit after official SheetJS replacement
+        if: always()
+        run: |
+          npm audit --omit=dev --json > a2-evidence/root-prod.json || true
+          git diff --binary > a2-evidence/sheetjs-candidate.patch
+          git diff --name-only > a2-evidence/changed-files.txt
+          cp package-lock.json a2-evidence/package-lock.json
+          cp frontend/package.json a2-evidence/frontend-package.json
+          cp backend/package.json a2-evidence/backend-package.json
+          cp backend/src/trade-document-import.ts a2-evidence/trade-document-import.ts
+          cp deploy/docker-compose/Dockerfile.backend a2-evidence/Dockerfile.backend
+          cp vendor/xlsx-0.20.3.tgz* a2-evidence/
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a2-official-sheetjs-candidate
+          path: a2-evidence/
+          if-no-files-found: warn
