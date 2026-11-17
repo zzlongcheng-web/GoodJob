@@ -35,6 +35,7 @@ jobs:
       - name: Nodemailer 10 candidate and mail regressions
         run: |
           npm install -w backend 'nodemailer@^10.0.0'
+          npm uninstall -D -w backend @types/nodemailer
           npm ci --no-audit --no-fund
           npm run build
           npm run test:email-delivery --workspace backend
