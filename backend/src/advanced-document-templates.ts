@@ -837,7 +837,6 @@ function buildVariablePiSheet(files: Record<string, Uint8Array>, document: Trade
     setFormula($, totalReference, `SUM(${subtotalReference}:${shippingReference})`, total(document));
   }
   updateVariableTemplatePageBreaks($, delta);
-  applyShortTemplatePrintFit($, count);
   xml.save();
   return delta;
 }
