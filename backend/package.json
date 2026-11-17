@@ -147,8 +147,8 @@
     "swagger-ui-express": "^5.0.1",
     "tldts": "^7.4.9",
     "twilio": "^6.0.2",
-    "xlsx-js-style": "^1.2.0",
-    "zod": "^3.23.8"
+    "zod": "^4.6.7",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
