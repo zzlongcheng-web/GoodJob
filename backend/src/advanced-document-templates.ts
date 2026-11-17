@@ -906,6 +906,45 @@ function updatePackingListLayout(files: Record<string, Uint8Array>, delta: numbe
   drawing.save();
 }
 
+/** Keep the three-line packing template on one physical PDF page.
+ * Dynamic packing lists retain their natural vertical pagination and repeated titles.
+ * Explicit OOXML fit settings are required: LibreOffice does not consistently honor
+ * the source XLSX page scaling after images have been replaced.
+ */
+function applyPackingListPrintFit($: XmlApi, itemCount: number) {
+  if (itemCount > 3) return;
+  const root = $(xmlTag("worksheet")).first();
+  let sheetPr = root.children(xmlTag("sheetPr")).first();
+  if (!sheetPr.length) {
+    const tag = xmlNode($, "sheetPr");
+    root.prepend(`<${tag}></${tag}>`);
+    sheetPr = root.children(xmlTag("sheetPr")).first();
+  }
+  let pageSetUpPr = sheetPr.children(xmlTag("pageSetUpPr")).first();
+  if (!pageSetUpPr.length) {
+    const tag = xmlNode($, "pageSetUpPr");
+    sheetPr.append(`<${tag}></${tag}>`);
+    pageSetUpPr = sheetPr.children(xmlTag("pageSetUpPr")).first();
+  }
+  pageSetUpPr.attr("fitToPage", "1").attr("autoPageBreaks", "0");
+  let pageSetup = root.children(xmlTag("pageSetup")).first();
+  if (!pageSetup.length) {
+    const tag = xmlNode($, "pageSetup");
+    const headerFooter = root.children(xmlTag("headerFooter")).first();
+    const drawing = root.children(xmlTag("drawing")).first();
+    const node = $(`<${tag}></${tag}>`);
+    if (headerFooter.length) headerFooter.before(node);
+    else if (drawing.length) drawing.before(node);
+    else root.append(node);
+    pageSetup = root.children(xmlTag("pageSetup")).first();
+  }
+  pageSetup.attr("fitToWidth", "1").attr("fitToHeight", "1");
+  pageSetup.removeAttr("scale");
+  // The source workbook contains manual breaks which override fit-to-page
+  // on some LibreOffice versions. Never delete breaks for longer documents.
+  root.children(xmlTag("rowBreaks")).remove();
+}
+
 function buildPackingList(files: Record<string, Uint8Array>, document: TradeDocument) {
   const xml = loadXml(files, "xl/worksheets/sheet1.xml");
   const { $ } = xml;
@@ -936,6 +975,7 @@ function buildPackingList(files: Record<string, Uint8Array>, document: TradeDocu
     const current = Number(node.attr("id") || 0);
     if (current >= 11) node.attr("id", String(current + delta));
   });
+  applyPackingListPrintFit($, count);
   xml.save();
   updatePackingListLayout(files, delta);
   return [delta];
