@@ -18,7 +18,7 @@ import { aiEngineAdapterLabel, clampAiEngineTimeout, engineCliProfile, readTeamA
 import { classifyEngineCliIssue, cliTaskDone, type EngineCliIssue, type EngineCliTaskSnapshot, engineRunnerOfflineIssue, engineRunnerQueueState, EngineUnavailableError, enqueueEngineCliTask, pickEngineRunner, readEngineCliTask, waitForEngineCliTask } from "../ai-engine-service.js";
 import { getSupplierRepository, SupplierCodeConflictError, supplierDuplicateKey, type SupplierInput } from "../supplier-repository.js";
 import { getFileRepository } from "../file-storage.js";
-import { type Customer, type CustomerIntelligenceFieldKey, type SessionUser } from "../types.js";
+import { type Customer, type CustomerActivity, type CustomerIntelligenceFieldKey, type SessionUser } from "../types.js";
 import { getLocalRunnerService } from "../integrations/integration-runtime.js";
 import { getStore } from "../store.js";
 import { acceptCustomerIntelligence, rejectCustomerIntelligence } from "../customer-intelligence.js";
@@ -902,6 +902,10 @@ export function registerCustomersRoutes(app: Express) {
   }));
 
   app.post("/api/customers/bulk-delete", requireAuth, asyncRoute(async (req, res) => {
+    if (req.user!.role === "sales" || !hasIamPermission(req.user!, "customer.delete")) {
+      res.status(403).json({ message: "普通业务员不能删除客户；请联系主管处理" });
+      return;
+    }
     const schema = z.object({ ids: z.array(z.string()).min(1).max(200) });
     const body = schema.parse(req.body);
     const store = getStore();
@@ -1054,6 +1058,12 @@ export function registerCustomersRoutes(app: Express) {
       res.status(404).json({ message: "跟进记录不存在或不属于该客户" });
       return;
     }
+    // 风险修复：原始沟通内容是考核证据，业务员只能改下次提醒；纠错请新增一条记录
+    if ((body.content !== undefined || body.type !== undefined) &&
+        (req.user!.role !== "admin" || !hasIamPermission(req.user!, "customer.activity.delete"))) {
+      res.status(403).json({ message: "只有管理员可更正已保存的沟通内容；业务员如有错误请新增一条更正记录；如有错误请新增一条更正记录" });
+      return;
+    }
     if (body.content !== undefined) activity.content = body.content;
     if (body.type !== undefined) activity.type = body.type;
     if (body.nextReminder !== undefined) {
@@ -1077,6 +1087,11 @@ export function registerCustomersRoutes(app: Express) {
     const store = getStore();
     const customer = findWritableCustomer(req.user!, req.params.id, res);
     if (!customer) return;
+    // 沟通记录是考核证据：只有管理员（customer.activity.delete）可删，业务员和主管都不行
+    if (req.user!.role !== "admin" || !hasIamPermission(req.user!, "customer.activity.delete")) {
+      res.status(403).json({ message: "沟通记录不可删除；如有错误请新增更正记录，或联系管理员" });
+      return;
+    }
     const index = store.customerActivities.findIndex(
       (item) => item.id === req.params.activityId && item.customerId === customer.id
     );
@@ -1085,8 +1100,39 @@ export function registerCustomersRoutes(app: Express) {
       return;
     }
     const [removed] = store.customerActivities.splice(index, 1);
-    void store.persist().catch((err) => console.error("customer activity persist failed:", err));
-    res.json({ removed: removed.id, customer: customerWithPipeline(customer, req.user!) });
+    // 审计：管理员删除沟通记录时，必须在同一客户下留下一条不可被业务员/主管删除的审计记录，
+    // 保留被删记录的原始全文、原创建人/时间、操作人和操作时间；审计持久化失败则整体回滚，不返回成功。
+    const auditEntry: CustomerActivity = {
+      id: `ca_audit_${randomUUID()}`,
+      customerId: customer.id,
+      type: "note",
+      content: [
+        "[管理员删除沟通记录·审计]",
+        `操作人: ${req.user!.id}`,
+        `操作时间: ${new Date().toISOString()}`,
+        `被删记录ID: ${removed.id}`,
+        `原类型: ${removed.type}`,
+        `原创建人: ${removed.operatorId}`,
+        `原创建时间: ${removed.createdAt}`,
+        `原内容: ${removed.content}`
+      ].join("\n"),
+      operatorId: req.user!.id,
+      nextReminder: "",
+      createdAt: new Date().toISOString()
+    };
+    store.customerActivities.unshift(auditEntry);
+    console.warn(`[audit] customer activity DELETED id=${removed.id} customer=${customer.id} by=${req.user!.id}`);
+    try {
+      await store.persist();
+    } catch (err) {
+      console.error("customer activity delete persist failed, rolled back:", err);
+      const auditIndex = store.customerActivities.findIndex((item) => item.id === auditEntry.id);
+      if (auditIndex >= 0) store.customerActivities.splice(auditIndex, 1);
+      store.customerActivities.splice(index, 0, removed);
+      res.status(500).json({ message: "删除未能保存，记录已保留，请稍后重试" });
+      return;
+    }
+    res.json({ removed: removed.id, auditId: auditEntry.id, customer: customerWithPipeline(customer, req.user!) });
   }));
 
   app.post("/api/customers/:id/meeting-notes", requireAuth, asyncRoute(async (req, res) => {

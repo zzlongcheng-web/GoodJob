@@ -422,7 +422,7 @@ describe("WhatsApp CRM Plugin API", () => {
     expect(second.body.conversation.id).toBe(first.body.conversation.id);
   });
 
-  it("imports a contact supplied by the parent GoodJob CRM and preserves its external identity", async () => {
+  it("imports a contact supplied by the parent Golden Gain CRM and preserves its external identity", async () => {
     const response = await request(runtime.app)
       .post(`/api/v1/crm/contacts/gj_customer_42/import`)
       .send({

@@ -61,8 +61,10 @@ function isIso(value: unknown) {
 
 try {
   const store = getStore();
-  const manager = store.users.find((item) => item.email === "alex@goodjob.com")!;
-  const management = await login("alex@goodjob.com");
+  const manager = store.users.find((item) => item.email === "admin@goodjob.com")!;
+  // 沟通记录的更正/撤销只有管理员可做（主管、业务员都不行）
+  const management = await login("admin@goodjob.com");
+  const managerToken = await login("alex@goodjob.com");
   const salesToken = await login("shirley@goodjob.com");
 
   // 种子数据：c1/c2 属 shirley(europe)，c3 属 mia(europe)；ca1→c1, ca2→c2, ca3→c3
@@ -181,6 +183,26 @@ try {
   check("sales 批量删除本人客户必须 → 403", ownCustomerBulkDelete.response.status === 403, ownCustomerBulkDelete.response.status);
   check("sales 批量删除不能改变客户数据", getStore().customers.some((item) => item.id === "c1"));
 
+  /* ---------------- 旧 WhatsApp 消息接口：员工不得删除本人沟通记录 ---------------- */
+  const ownLegacyWhatsappMessage = {
+    id: "wa_delete_guard_probe",
+    customerId: "c1",
+    direction: "inbound" as const,
+    content: "Customer reply for permission regression",
+    contentTranslated: "",
+    mediaUrl: "",
+    status: "received",
+    waMessageId: "wa_delete_guard_probe_provider",
+    createdAt: "2026-11-16T10:00:00.000Z"
+  };
+  getStore().whatsappMessages.push(ownLegacyWhatsappMessage);
+  const ownWhatsAppDelete = await request("/api/whatsapp/messages/wa_delete_guard_probe", salesToken, {
+    method: "DELETE"
+  });
+  check("sales 删除本人 WhatsApp 消息必须 → 403", ownWhatsAppDelete.response.status === 403, ownWhatsAppDelete.response.status);
+  check("sales 删除 WhatsApp 消息后数据仍保留",
+    getStore().whatsappMessages.some((message) => message.id === ownLegacyWhatsappMessage.id));
+
   /* ---------------- DELETE 撤销 ---------------- */
   const created = await request("/api/customers/c1/activities", management, {
     method: "POST",
@@ -194,10 +216,20 @@ try {
   const removed = await request(`/api/customers/c1/activities/${probeId}`, management, { method: "DELETE" });
   check("撤销跟进 → 200", removed.response.status === 200, removed.response.status);
   check(
-    "撤销后总数 -1",
-    getStore().customerActivities.length === countBeforeDelete - 1,
+    "撤销后总数不变（删 1 条 + 新增 1 条审计记录）",
+    getStore().customerActivities.length === countBeforeDelete,
     { before: countBeforeDelete, after: getStore().customerActivities.length }
   );
+  const auditEntry = getStore().customerActivities.find((item) => item.id === removed.json.auditId);
+  check("管理员删除沟通记录留下审计记录", Boolean(auditEntry), removed.json.auditId);
+  check(
+    "审计记录含被删记录ID、原内容和操作人",
+    Boolean(auditEntry && auditEntry.content.includes(probeId) && auditEntry.content.includes("撤销探针") && auditEntry.operatorId),
+    auditEntry?.content
+  );
+  const auditDeleteBySales = await request(`/api/customers/c1/activities/${removed.json.auditId}`, salesToken, { method: "DELETE" });
+  check("业务员不能删除审计记录 → 403", auditDeleteBySales.response.status === 403, auditDeleteBySales.response.status);
+  check("审计记录仍然保留", getStore().customerActivities.some((item) => item.id === removed.json.auditId));
   check("撤销后该记录确实不存在", !getStore().customerActivities.some((item) => item.id === probeId));
   check("撤销返回被删 id", removed.json.removed === probeId, removed.json.removed);
 
@@ -213,7 +245,15 @@ try {
   );
 
   const removeForbidden = await request("/api/customers/c3/activities/ca3", salesToken, { method: "DELETE" });
-  check("sales 撤销他人名下客户的跟进 → 404", removeForbidden.response.status === 404, removeForbidden.response.status);
+  check("sales 撤销他人名下客户的跟进必须 → 403", removeForbidden.response.status === 403, removeForbidden.response.status);
+  const managerDelete = await request("/api/customers/c1/activities/ca1", managerToken, { method: "DELETE" });
+  check("主管撤销沟通记录 → 403（只有管理员可以）", managerDelete.response.status === 403, managerDelete.response.status);
+  const managerEdit = await request("/api/customers/c1/activities/ca1", managerToken, { method: "PATCH", body: JSON.stringify({ content: "主管改写" }) });
+  check("主管改写沟通正文 → 403", managerEdit.response.status === 403, managerEdit.response.status);
+  const salesEdit = await request("/api/customers/c1/activities/ca1", salesToken, { method: "PATCH", body: JSON.stringify({ content: "业务员改写" }) });
+  check("业务员改写沟通正文 → 403", salesEdit.response.status === 403, salesEdit.response.status);
+  const salesReminder = await request("/api/customers/c1/activities/ca1", salesToken, { method: "PATCH", body: JSON.stringify({ nextReminder: "下周一" }) });
+  check("业务员只改下次提醒 → 200", salesReminder.response.status === 200, salesReminder.response.status);
   check(
     "越权撤销未误删目标记录",
     getStore().customerActivities.some((item) => item.id === "ca3")

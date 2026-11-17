@@ -9,6 +9,8 @@ import { z } from "zod";
 import { canSeeOwner, canSeePersonalData, requireAuth } from "../auth.js";
 import { type Customer, type Deal, type Todo } from "../types.js";
 import { getStore } from "../store.js";
+import { calculateMonthlyNewCustomerPerformance } from "../monthly-new-customer-performance.js";
+import { buildManagementPerformance } from "../management-performance.js";
 import {
   archiveExpiredTodos,
   asyncRoute,
@@ -146,6 +148,29 @@ function reportRegion(country: string) {
 }
 
 export function registerReportsRoutes(app: Express) {
+  // The /api/reports IAM middleware applies before this route (report.read).
+  // The scope is determined on the server, never from client-supplied owner IDs.
+  app.get("/api/reports/monthly-new-customer-communications", requireAuth, (req, res) => {
+    const queryMonth = typeof req.query.month === "string" ? req.query.month : undefined;
+    if (queryMonth !== undefined && !/^(?:19|20|21)\d{2}-(?:0[1-9]|1[0-2])$/u.test(queryMonth)) {
+      res.status(400).json({ message: "month 必须是 YYYY-MM" });
+      return;
+    }
+    const store = getStore();
+    const scopedCustomers = store.customers.filter((customer) =>
+      canSeeOwner(req.user!, customer.ownerId, customer.teamId));
+    const visibleSalesIds = store.users.filter((user) =>
+      user.role === "sales" && user.status === "active" && canSeeOwner(req.user!, user.id, user.teamId)
+    ).map((user) => user.id);
+    res.json(calculateMonthlyNewCustomerPerformance({
+      month: queryMonth || new Date().toISOString().slice(0, 7),
+      customers: scopedCustomers,
+      activities: store.customerActivities,
+      whatsappMessages: store.whatsappMessages,
+      ownerIds: visibleSalesIds
+    }));
+  });
+
   app.get("/api/dashboard/summary", requireAuth, (req, res) => {
     const store = getStore();
     const archived = archiveExpiredTodos(store.todos, new Date());
@@ -509,6 +534,11 @@ export function registerReportsRoutes(app: Express) {
   }));
 
   app.get("/api/reports/executive", requireAuth, (req, res) => {
+    const requestedMonth = req.query.managementMonth;
+    if (requestedMonth !== undefined && (typeof requestedMonth !== "string" || !/^\d{4}-(?:0[1-9]|1[0-2])$/.test(requestedMonth))) {
+      res.status(400).json({ message: "管理报表月份格式不正确" });
+      return;
+    }
     const store = getStore();
     const reportOwner = store.users.find((user) => user.id === req.user!.id);
     const now = new Date();
@@ -593,6 +623,13 @@ export function registerReportsRoutes(app: Express) {
       }))
       .sort((left, right) => right.count - left.count || left.region.localeCompare(right.region));
     const visibleOwnerIds = new Set([...scopedCustomers.map((customer) => customer.ownerId), ...scopedDeals.map((deal) => deal.ownerId)]);
+    const monthlyNewCustomerPerformance = calculateMonthlyNewCustomerPerformance({
+      month: now.toISOString().slice(0, 7),
+      customers: scopedCustomers,
+      activities: store.customerActivities,
+      whatsappMessages: store.whatsappMessages
+    });
+    const monthlyNewByOwner = new Map(monthlyNewCustomerPerformance.members.map((member) => [member.ownerId, member]));
     const performance = [...visibleOwnerIds].map((ownerId) => {
       const ownerCustomers = scopedCustomers.filter((customer) => customer.ownerId === ownerId);
       const ownerCustomerIds = new Set(ownerCustomers.map((customer) => customer.id));
@@ -604,6 +641,7 @@ export function registerReportsRoutes(app: Express) {
         owner: userMap.get(ownerId)?.name || ownerId,
         customerCount: ownerCustomers.length,
         followUpCount: followUps.length,
+        monthlyNewCustomerCommunications: monthlyNewByOwner.get(ownerId),
         activeDealCount: ownerActiveDeals.length,
         forecastAmounts: reportMoneyRows(ownerActiveDeals, (deal) => deal.amount * (reportStageWeights[deal.stage] || 0)),
         riskCount: ownerRiskDeals.length,
@@ -697,6 +735,8 @@ export function registerReportsRoutes(app: Express) {
       })),
       performanceTitle: scopeKey === "self" ? "个人经营效率" : "成员经营对比",
       performance,
+      monthlyNewCustomerPerformance,
+      management: buildManagementPerformance(store, req.user!, (typeof requestedMonth === "string" ? requestedMonth : reportDate(now).slice(0, 7)), now),
       riskRows,
       actions,
       definitions: [
