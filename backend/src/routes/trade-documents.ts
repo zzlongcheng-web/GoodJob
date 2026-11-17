@@ -1373,6 +1373,11 @@ export function registerTradeDocumentsRoutes(app: Express) {
   }));
 
   app.delete("/api/document-assets/letterheads/:id", requireAuth, asyncRoute(async (req, res) => {
+    // 风险修复：该记录属于公司业务资料，普通业务员不得删除
+    if (req.user!.role === "sales") {
+      res.status(403).json({ message: "业务员不能删除公司信头；请联系主管" });
+      return;
+    }
     const store = getStore();
     const index = store.documentLetterheads.findIndex((item) => item.id === req.params.id && item.teamId === req.user!.teamId);
     if (index < 0) {
@@ -1420,6 +1425,11 @@ export function registerTradeDocumentsRoutes(app: Express) {
   }));
 
   app.delete("/api/document-assets/stamps/:id", requireAuth, asyncRoute(async (req, res) => {
+    // 风险修复：该记录属于公司业务资料，普通业务员不得删除
+    if (req.user!.role === "sales") {
+      res.status(403).json({ message: "业务员不能删除公司印章；请联系主管" });
+      return;
+    }
     const store = getStore();
     const index = store.documentStamps.findIndex((item) => item.id === req.params.id && item.teamId === req.user!.teamId);
     if (index < 0) {

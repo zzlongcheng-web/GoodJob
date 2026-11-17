@@ -64,7 +64,7 @@ try {
   if (companyProfile) {
     originalCompanyProfile = structuredClone(companyProfile);
     Object.assign(companyProfile, {
-      companyName: "GoodJob Test Exporter",
+      companyName: "Golden Gain Test Exporter",
       productSummary: "Industrial test products",
       website: "https://goodjob.example.test"
     });
@@ -72,7 +72,7 @@ try {
     insertedCompanyProfile = true;
     store.companyProfiles.push({
       teamId: owner.teamId,
-      companyName: "GoodJob Test Exporter",
+      companyName: "Golden Gain Test Exporter",
       productSummary: "Industrial test products",
       website: "https://goodjob.example.test",
       address: "",

@@ -29,13 +29,16 @@ else
   SESSION_COOKIE_SECURE=false
 fi
 
-DEFAULT_INITIAL_ADMIN_EMAIL="admin@goodjob.com"
-DEFAULT_INITIAL_ADMIN_NAME="GoodJob Admin"
+DEFAULT_INITIAL_ADMIN_NAME="Golden Gain Admin"
 
-read -r -p "首次超级管理员邮箱 [$DEFAULT_INITIAL_ADMIN_EMAIL]：" INITIAL_ADMIN_EMAIL
-INITIAL_ADMIN_EMAIL="${INITIAL_ADMIN_EMAIL:-$DEFAULT_INITIAL_ADMIN_EMAIL}"
+# 安全修复：不再提供默认管理员邮箱，必须显式输入公司自己的邮箱，且禁止使用原项目的演示域名
+read -r -p "首次超级管理员邮箱（必须填写，使用公司自己的邮箱）：" INITIAL_ADMIN_EMAIL
+[[ -n "$INITIAL_ADMIN_EMAIL" ]] || die "必须填写管理员邮箱"
 [[ "$INITIAL_ADMIN_EMAIL" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,63}$ ]] \
   || die "管理员邮箱格式不正确"
+case "${INITIAL_ADMIN_EMAIL,,}" in
+  *@goodjob.com|*@goodjob-crm.com) die "不能使用 goodjob.com / goodjob-crm.com 演示域名作为管理员邮箱" ;;
+esac
 read -r -p "首次超级管理员姓名 [$DEFAULT_INITIAL_ADMIN_NAME]：" INITIAL_ADMIN_NAME
 INITIAL_ADMIN_NAME="${INITIAL_ADMIN_NAME:-$DEFAULT_INITIAL_ADMIN_NAME}"
 INITIAL_ADMIN_NAME="${INITIAL_ADMIN_NAME// /_}"
@@ -65,16 +68,21 @@ fi
 install -d -m 0700 "$SECRETS_DIR" "$STATE_DIR" "$BACKUP_DIR"
 printf '%s' "$INITIAL_ADMIN_PASSWORD" > "$SECRETS_DIR/initial_admin_password"
 unset INITIAL_ADMIN_PASSWORD
+# 安全修复：默认只生成表头（文件需存在以便挂载），不再生成 50 组 beta-admin 凭据；
+# 仅在明确设置 GOODJOB_PROVISION_BETA_ADMINS=true 时才生成。
 {
   printf '序号\t管理员名称\t登录邮箱\t团队编号\t初始密码\n'
-  for sequence in $(seq 1 50); do
-    number="$(printf '%02d' "$sequence")"
-    team_number="$(printf '%03d' "$sequence")"
-    password="$(openssl rand -hex 24)"
-    printf '%s\tGoodJob Admin %s\tbeta-admin-%s@goodjob-crm.com\tbeta-%s\t%s\n' \
-      "$sequence" "$number" "$number" "$team_number" "$password"
-  done
+  if [[ "${GOODJOB_PROVISION_BETA_ADMINS:-false}" == "true" ]]; then
+    for sequence in $(seq 1 50); do
+      number="$(printf '%02d' "$sequence")"
+      team_number="$(printf '%03d' "$sequence")"
+      password="$(openssl rand -hex 24)"
+      printf '%s\tGolden Gain Admin %s\tbeta-admin-%s@goodjob-crm.com\tbeta-%s\t%s\n' \
+        "$sequence" "$number" "$number" "$team_number" "$password"
+    done
+  fi
 } > "$SECRETS_DIR/admin_credentials.tsv"
+chmod 600 "$SECRETS_DIR/admin_credentials.tsv"
 openssl rand -hex 32 > "$SECRETS_DIR/mysql_password"
 openssl rand -hex 32 > "$SECRETS_DIR/mysql_root_password"
 openssl rand -hex 32 > "$SECRETS_DIR/postgres_password"
@@ -111,15 +119,14 @@ PUBLIC_SCHEME=$PUBLIC_SCHEME
 PUBLIC_ORIGIN=$PUBLIC_SCHEME://$DOMAIN
 SESSION_COOKIE_SECURE=$SESSION_COOKIE_SECURE
 GOODJOB_HTTP_PORT=4188
-GOODJOB_IMAGE_MODE=registry
-GOODJOB_BACKEND_IMAGE=crpi-f1g4pi9vyexdaer5.cn-hongkong.personal.cr.aliyuncs.com/kevin_goodjobcrm/backend
-GOODJOB_GATEWAY_IMAGE=crpi-f1g4pi9vyexdaer5.cn-hongkong.personal.cr.aliyuncs.com/kevin_goodjobcrm/gateway
-GOODJOB_COMMUNICATION_IMAGE=crpi-f1g4pi9vyexdaer5.cn-hongkong.personal.cr.aliyuncs.com/kevin_goodjobcrm/communication
+# 安全修复：不再默认拉取原作者个人镜像仓库的镜像，一律用本仓库源码在本机构建
+GOODJOB_IMAGE_MODE=local
+GOODJOB_TZ=Asia/Shanghai
 INITIAL_ADMIN_EMAIL=$INITIAL_ADMIN_EMAIL
 INITIAL_ADMIN_NAME=$INITIAL_ADMIN_NAME
 MYSQL_DATABASE=goodjob_crm_prod
 MYSQL_USER=goodjob_crm_app
-ENABLE_API_DOCS=true
+ENABLE_API_DOCS=false
 GOODJOB_BACKUP_RETENTION_COUNT=10
 MYSQL_MEMORY_LIMIT=768m
 MYSQL_CPU_LIMIT=1.0

@@ -75,7 +75,7 @@ import type { SessionUser } from "./types.js";
 
 // ---- 4. 提示词：Codex 版不再要求 Skill 工具 / WebFetch，改为读取同一份技能包文件
 {
-  const tender = buildTenderDailyCliPrompt({ reportDate: "2026-11-05", companyName: "GoodJob", productSummary: "water pumps", regions: "Asia", focusNote: "" });
+  const tender = buildTenderDailyCliPrompt({ reportDate: "2026-11-05", companyName: "Golden Gain", productSummary: "water pumps", regions: "Asia", focusNote: "" });
   assert.equal(adaptEngineCliPromptForAdapter(tender, "workbuddy"), tender, "WorkBuddy 提示词原样不变");
   const codexTender = adaptEngineCliPromptForAdapter(tender, "codex");
   assert.ok(!/Skill tool|WebFetch/u.test(codexTender), "Codex 版不含 WorkBuddy 专属工具名");

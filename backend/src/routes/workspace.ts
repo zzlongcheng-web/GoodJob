@@ -26,7 +26,7 @@ import {
 } from "../server-core.js";
 
 function collaborationUser(userId: string) {
-  if (userId === "system") return { id: "system", name: "GoodJob", avatar: "GJ", role: "admin" as const, teamId: "" };
+  if (userId === "system") return { id: "system", name: "Golden Gain", avatar: "GJ", role: "admin" as const, teamId: "" };
   const user = getStore().users.find((item) => item.id === userId);
   return user ? { id: user.id, name: user.name, avatar: user.avatar, role: user.role, teamId: user.teamId } : {
     id: userId,

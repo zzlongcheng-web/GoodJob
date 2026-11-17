@@ -143,7 +143,7 @@ try {
     isDefault: true, enabled: true, updatedBy: "u_admin", updatedAt: now
   });
   store.documentLetterheads.push({
-    id: "letterhead_defaults_sweden", teamId: "europe", name: "Sweden Sales Company", companyName: "GoodJob Sweden Trading AB",
+    id: "letterhead_defaults_sweden", teamId: "europe", name: "Sweden Sales Company", companyName: "Golden Gain Sweden Trading AB",
     address: "10 Exportgatan, Gothenburg, Sweden", phone: "+46 31 555 010", email: "sweden@example.test", website: "https://se.example.test",
     bankInfo: "SWEDEN BANK", contact: "Anna Lind", taxNo: "SE-556677", logoUrl: "",
     matchCountries: ["瑞典"], matchCurrencies: ["USD"], matchDocumentTypes: ["PI"], matchPriority: 80,
@@ -316,14 +316,14 @@ try {
   assert.equal(matchedDealResponse.status, 200, "country-specific seller matching must create the document");
   const matchedDealDocument = (await matchedDealResponse.json()).document as TradeDocument;
   assert.equal(matchedDealDocument.customerId, "c1");
-  assert.equal(matchedDealDocument.seller, "GoodJob Sweden Trading AB", "Sweden + USD + PI must select the Sweden seller company");
+  assert.equal(matchedDealDocument.seller, "Golden Gain Sweden Trading AB", "Sweden + USD + PI must select the Sweden seller company");
   assert.equal(matchedDealDocument.letterheadId, "letterhead_defaults_sweden");
   assert.equal(matchedDealDocument.sellerContact, "Anna Lind");
   assert.equal(matchedDealDocument.sellerTaxNo, "SE-556677");
   assert.equal(matchedDealDocument.bankInfo, "SWEDEN BANK");
   assert.equal(matchedDealDocument.stampId, "stamp_defaults_europe");
   assert.equal(matchedDealDocument.signatureId, "signature_defaults_europe");
-  assert.equal(matchedDealDocument.letterheadSnapshot?.companyName, "GoodJob Sweden Trading AB");
+  assert.equal(matchedDealDocument.letterheadSnapshot?.companyName, "Golden Gain Sweden Trading AB");
 
   const analysis = importAnalysis("u_sales_shirley", "europe");
   store.tradeDocumentImportAnalyses.unshift(analysis);

@@ -4,6 +4,8 @@ import type { NextFunction, Request, Response } from "express";
 export interface CrmIdentity {
   userId: string;
   authVersion: number;
+  /** Signed by the CRM. Missing or unrecognized legacy claims are least privileged. */
+  role: "sales" | "manager" | "admin";
 }
 
 declare global {
@@ -41,7 +43,7 @@ export function verifyCrmToken(secret: string | undefined, token: string): CrmId
   if (!header || !payload) return null;
   try {
     const parsedHeader = JSON.parse(header) as { alg?: string };
-    const claims = JSON.parse(payload) as { sub?: string; ver?: number; iss?: string; aud?: string; exp?: number; nbf?: number };
+    const claims = JSON.parse(payload) as { sub?: string; ver?: number; role?: string; iss?: string; aud?: string; exp?: number; nbf?: number };
     const now = Math.floor(Date.now() / 1000);
     if (parsedHeader.alg !== "HS256" || claims.iss !== "goodjob-crm" || claims.aud !== "goodjob-crm-web"
       || !claims.sub || !Number.isFinite(claims.exp) || (claims.exp as number) <= now
@@ -49,7 +51,11 @@ export function verifyCrmToken(secret: string | undefined, token: string): CrmId
     const expected = createHmac("sha256", secret).update(`${encodedHeader}.${encodedPayload}`).digest();
     const actual = Buffer.from(encodedSignature, "base64url");
     if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) return null;
-    return { userId: claims.sub, authVersion: Number(claims.ver || 1) };
+    return {
+      userId: claims.sub,
+      authVersion: Number(claims.ver || 1),
+      role: claims.role === "manager" || claims.role === "admin" ? claims.role : "sales"
+    };
   } catch {
     return null;
   }
@@ -61,7 +67,7 @@ export function requireCrmAuth(secret: string | undefined) {
     // The legacy unit suite runs an in-memory app without an HTTP session. Keep
     // that harness usable while production and development always require JWT.
     if (process.env.NODE_ENV === "test" && !secret && !request.header("authorization") && !request.header("cookie")) {
-      request.crmIdentity = { userId: "test-user", authVersion: 1 };
+      request.crmIdentity = { userId: "test-user", authVersion: 1, role: "admin" };
       next();
       return;
     }

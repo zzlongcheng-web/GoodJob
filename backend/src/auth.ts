@@ -126,7 +126,7 @@ export function publicUser(user: ReturnType<typeof getStore>["users"][number]): 
 
 export function signToken(user: SessionUser, context: { mfaVerified?: boolean; ttlSeconds?: number } = {}): string {
   return jwt.sign(
-    { ver: user.authVersion, mfa: context.mfaVerified === true },
+    { ver: user.authVersion, mfa: context.mfaVerified === true, role: user.role },
     jwtSecret(),
     {
       subject: user.id,
