@@ -6,7 +6,7 @@ import type { getStore } from "./store.js";
 /** Read-only manager metrics; no CRM state changes or unverified performance claims. */
 type Store = ReturnType<typeof getStore>;
 const GOAL = 61;
-const ZONE = "America/New_York";
+const ZONE = "Asia/Shanghai";
 function businessDate(value: string | Date) {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return "";

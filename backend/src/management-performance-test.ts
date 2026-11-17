@@ -16,6 +16,7 @@ const original = buildManagementPerformance(store, manager, month, new Date("202
 assert.ok(original && original.rows.every((row) => store.users.some((u) =>
   u.id === row.ownerId && u.teamId === manager.teamId && u.role === "sales")));
 assert.equal(original?.target, 61);
+assert.equal(original?.timezone, "Asia/Shanghai");
 
 const invalid = parseLeadText("Company: NoContact 1794686400000 Ltd\nContact: Nobody");
 assert.equal(invalid.phone, "", "13-digit timestamp embedded in company must not be telephone");
