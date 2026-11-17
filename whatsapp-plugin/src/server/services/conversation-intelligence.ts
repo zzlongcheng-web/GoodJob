@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { z } from "zod";
+import { z } from "zod/v3";
 import type { ChatMessage, ConversationAnalysis, ConversationFollowUp, ConversationTrait, ConversationTraitFeedback } from "../../shared/types.js";
 import { Repository } from "../db/repository.js";
 import { RealtimeHub } from "../realtime.js";
