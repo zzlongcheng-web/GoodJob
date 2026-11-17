@@ -837,6 +837,7 @@ function buildVariablePiSheet(files: Record<string, Uint8Array>, document: Trade
     setFormula($, totalReference, `SUM(${subtotalReference}:${shippingReference})`, total(document));
   }
   updateVariableTemplatePageBreaks($, delta);
+  applyShortTemplatePrintFit($, count);
   xml.save();
   return delta;
 }
@@ -911,7 +912,7 @@ function updatePackingListLayout(files: Record<string, Uint8Array>, delta: numbe
  * Explicit OOXML fit settings are required: LibreOffice does not consistently honor
  * the source XLSX page scaling after images have been replaced.
  */
-function applyPackingListPrintFit($: XmlApi, itemCount: number) {
+function applyShortTemplatePrintFit($: XmlApi, itemCount: number) {
   if (itemCount > 3) return;
   const root = $(xmlTag("worksheet")).first();
   let sheetPr = root.children(xmlTag("sheetPr")).first();
@@ -975,7 +976,7 @@ function buildPackingList(files: Record<string, Uint8Array>, document: TradeDocu
     const current = Number(node.attr("id") || 0);
     if (current >= 11) node.attr("id", String(current + delta));
   });
-  applyPackingListPrintFit($, count);
+  applyShortTemplatePrintFit($, count);
   xml.save();
   updatePackingListLayout(files, delta);
   return [delta];
@@ -1034,6 +1035,7 @@ function buildPiSheet(files: Record<string, Uint8Array>, document: TradeDocument
   setText($, `A${footerRow + delta}`, `Should you have any enquiries concerning this invoice, please contact ${document.seller}`);
   setText($, `A${footerRow + 1 + delta}`, document.sellerAddress);
   updateVariableTemplatePageBreaks($, delta);
+  applyShortTemplatePrintFit($, count);
   xml.save();
   return delta;
 }
