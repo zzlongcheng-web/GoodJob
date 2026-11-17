@@ -108,7 +108,7 @@ TRACKING_17TRACK_TOKEN=$TRACKING_17TRACK_TOKEN
 EOF
 # Official Node images run as uid/gid 1000. Keep secrets root-owned while
 # granting the application containers group-read access to bind-mounted files.
-chown 0:1000 "$SECRETS_DIR"/*
+chown 0:1001 "$SECRETS_DIR"/*
 chmod 0640 "$SECRETS_DIR"/*
 
 cat > "$ENV_FILE" <<EOF
