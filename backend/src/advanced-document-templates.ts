@@ -1196,6 +1196,7 @@ function buildSupplierOrder(files: Record<string, Uint8Array>, document: TradeDo
   });
   setText($, "A15", `总备注：${document.notes || ""}`);
   shrinkCellsToFit(files, $, ["B2", "D2", "F2", "H2", "B3", "D3", "F3", "H3"]);
+  applyShortTemplatePrintFit($, document.items.length);
   xml.save();
 }
 
