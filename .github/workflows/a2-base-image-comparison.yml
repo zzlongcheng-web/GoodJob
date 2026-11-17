@@ -1,0 +1,81 @@
+name: A2 Debian 13 base image comparison (read-only)
+on:
+  push:
+    branches: [deps/a2-validation-hardening-20261117]
+permissions:
+  contents: read
+jobs:
+  base-image-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 105
+    env:
+      CI: 'true'
+      NODE_ENV: test
+      JWT_SECRET: goodjob-a2-ci-jwt-secret-not-for-production-32-characters
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Build source using frozen npm locks
+        run: |
+          mkdir -p a2-evidence
+          npm ci --no-audit --no-fund
+          npm --prefix whatsapp-plugin ci --no-audit --no-fund
+          npm run build
+      - name: Create experimental Debian 13 image Dockerfiles, never commit them
+        run: |
+          for p in deploy/docker-compose/Dockerfile.backend deploy/docker-compose/Dockerfile.communication; do
+            grep -qx 'FROM node:22-bookworm-slim' <(head -n 1 "$p")
+            sed -i '1s|node:22-bookworm-slim|node:22-trixie-slim|' "$p"
+          done
+          docker build -t a2-backend:trixie -f deploy/docker-compose/Dockerfile.backend .
+          docker build -t a2-communication:trixie -f deploy/docker-compose/Dockerfile.communication .
+      - name: Candidate production import smoke
+        run: |
+          docker run --rm --entrypoint node a2-backend:trixie --input-type=module -e 'await import("./backend/dist/whatsapp-service.js"); console.log("Debian13 backend import OK")'
+          docker run --rm --entrypoint node a2-communication:trixie --version
+      - name: Trivy Debian 13 backend candidate
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: a2-backend:trixie
+          severity: HIGH,CRITICAL
+          format: json
+          output: a2-evidence/trivy-backend-trixie.json
+          exit-code: '0'
+      - name: Trivy Debian 13 communication candidate
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: a2-communication:trixie
+          severity: HIGH,CRITICAL
+          format: json
+          output: a2-evidence/trivy-communication-trixie.json
+          exit-code: '0'
+      - name: Summarize findings against audited bookworm baseline
+        run: |
+          node - <<'JS'
+          const fs=require('node:fs');
+          const counts={};
+          for(const [service,baseCritical,baseHigh] of [['backend',4,178],['communication',1,114]]) {
+            const data=JSON.parse(fs.readFileSync('a2-evidence/trivy-'+service+'-trixie.json','utf8'));
+            const vulns=data.Results?.flatMap(x=>x.Vulnerabilities||[])||[];
+            const high=vulns.filter(v=>v.Severity==='HIGH').length;
+            const critical=vulns.filter(v=>v.Severity==='CRITICAL').length;
+            counts[service]={before:{critical:baseCritical,high:baseHigh},candidate:{critical,high},remainingCritical:vulns.filter(v=>v.Severity==='CRITICAL').map(v=>({id:v.VulnerabilityID,package:v.PkgName,status:v.Status,fix:v.FixedVersion||null}))};
+            console.log(service,JSON.stringify(counts[service]));
+          }
+          fs.writeFileSync('a2-evidence/compare.json',JSON.stringify(counts,null,2));
+          if(Object.values(counts).some(v=>v.candidate.critical>0)) {
+             console.error('RELEASE BLOCKED: Debian13 candidate still has Critical; do not promote Docker base');
+             process.exitCode=1;
+          }
+          JS
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a2-debian13-comparison
+          path: a2-evidence/
+          if-no-files-found: warn

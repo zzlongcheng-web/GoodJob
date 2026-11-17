@@ -1,0 +1,88 @@
+name: A2 Docker, Trivy and Zod memory evidence
+on:
+  push:
+    branches: [deps/a2-validation-hardening-20261117]
+permissions:
+  contents: read
+jobs:
+  image-and-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 100
+    env:
+      CI: 'true'
+      NODE_ENV: test
+      JWT_SECRET: goodjob-a2-ci-jwt-secret-not-for-production-32-characters
+      GOODJOB_RELEASE_ID: a2-ci
+      GOODJOB_IMAGE_MODE: local
+      GOODJOB_SHARED_DIR: /tmp/goodjob-a2-ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Frozen dependencies and production build
+        run: |
+          mkdir -p a2-evidence
+          npm ci --no-audit --no-fund
+          npm --prefix whatsapp-plugin ci --no-audit --no-fund
+          npm run build
+      - name: Measure constrained Zod arrays at nearly 3MB without public traffic
+        run: |
+          set -o pipefail
+          timeout 45s node --expose-gc --max-old-space-size=512 scripts/a2-zod-memory-smoke.cjs backend | tee a2-evidence/zod-backend.json
+          timeout 45s node --expose-gc --max-old-space-size=512 scripts/a2-zod-memory-smoke.cjs whatsapp-plugin | tee a2-evidence/zod-plugin.json
+      - name: Docker compose local image builds
+        run: |
+          docker compose -f deploy/docker-compose/compose.yml --profile tools build backend-migrate communication-migrate gateway
+      - name: Inspect actual backend production image
+        run: |
+          docker image inspect goodjobcrm-backend:a2-ci --format '{{.Id}}' > a2-evidence/backend-image-id.txt
+          docker run --rm --entrypoint sh goodjobcrm-backend:a2-ci -ec '
+            test ! -e /app/node_modules/whatsapp-web.js
+            test ! -e /app/node_modules/puppeteer
+            test ! -e /app/node_modules/puppeteer-core
+            test ! -e /app/node_modules/@puppeteer/browsers
+            test ! -e /app/node_modules/vite
+            echo "Production image excludes WhatsApp Web, Puppeteer, and Vite"
+          ' | tee a2-evidence/prod-image-deps.txt
+          docker run --rm --entrypoint node goodjobcrm-backend:a2-ci --input-type=module -e 'await import("./backend/dist/whatsapp-service.js"); console.log("Production WhatsApp module import succeeded")' | tee a2-evidence/backend-import-smoke.txt
+      - name: Trivy scan backend image (report findings without hiding them)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: goodjobcrm-backend:a2-ci
+          format: json
+          output: a2-evidence/trivy-backend.json
+          severity: HIGH,CRITICAL
+          exit-code: '0'
+      - name: Trivy scan communication image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: goodjobcrm-communication:a2-ci
+          format: json
+          output: a2-evidence/trivy-communication.json
+          severity: HIGH,CRITICAL
+          exit-code: '0'
+      - name: Release security gate (no Critical image findings)
+        run: |
+          node - <<'JS'
+          const fs=require('node:fs');
+          let critical=0;
+          for(const name of ['backend','communication']){
+            const report=JSON.parse(fs.readFileSync('a2-evidence/trivy-'+name+'.json','utf8'));
+            const vulnerabilities=(report.Results||[]).flatMap(r=>r.Vulnerabilities||[]);
+            const counts=Object.fromEntries(['HIGH','CRITICAL'].map(s=>[s,vulnerabilities.filter(v=>v.Severity===s).length]));
+            console.log(name,JSON.stringify(counts));
+            critical+=counts.CRITICAL;
+          }
+          if(critical>0){console.error('RELEASE BLOCKED: '+critical+' Critical image findings; evidence preserved');process.exit(1);}
+          JS
+      - name: Store logs and findings including failed steps
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a2-container-security-evidence
+          path: a2-evidence/
+          if-no-files-found: warn

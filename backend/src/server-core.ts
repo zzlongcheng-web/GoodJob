@@ -1016,7 +1016,7 @@ export async function sendOutboundEmail(user: ReturnType<typeof getStore>["users
 }
 
 /** 用内存流 transport 把一封邮件编译成原始 MIME（不产生任何网络请求）。 */
-async function compileOutboundRawMessage(mailOptions: nodemailer.SendMailOptions) {
+async function compileOutboundRawMessage(mailOptions: Parameters<ReturnType<typeof nodemailer.createTransport>["sendMail"]>[0]) {
   const compiler = nodemailer.createTransport({ streamTransport: true, newline: "unix", buffer: true });
   const compiled = await compiler.sendMail(mailOptions);
   if (!Buffer.isBuffer(compiled.message)) throw new Error("编译邮件原文失败");
