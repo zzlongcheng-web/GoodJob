@@ -76,13 +76,19 @@ jobs:
         run: |
           npm run build
           npm run test:trade-document-import --workspace backend
-          npm run test:trade-document-excel --workspace backend
           npm test
       - name: Confirm production install can access vendored tarball
         run: |
           sed -i '/^COPY package.json package-lock.json .\//a COPY vendor vendor' deploy/docker-compose/Dockerfile.backend
           docker build -f deploy/docker-compose/Dockerfile.backend -t a2-xlsx-backend:test .
           docker run --rm --entrypoint node a2-xlsx-backend:test -e "const p=require('./node_modules/xlsx/package.json'); if(p.version!=='0.20.3')process.exit(1); console.log('Vendored production xlsx',p.version)"
+      - name: Verify Excel PDF template pagination using production-matched LibreOffice
+        run: |
+          docker run --rm --mount type=bind,source="$PWD",target=/app --workdir /app \
+            --env NODE_ENV=test --env LIBREOFFICE_BIN=/usr/bin/soffice \
+            --env JWT_SECRET=goodjob-a2-ci-jwt-secret-not-for-production-32-characters \
+            --entrypoint sh a2-xlsx-backend:test \
+            -ec 'npm run test:trade-document-excel --workspace backend'
       - name: Audit after official SheetJS replacement
         if: always()
         run: |
