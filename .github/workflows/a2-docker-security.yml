@@ -1,7 +1,7 @@
 name: A2 Docker, Trivy and Zod memory evidence
 on:
   push:
-    branches: [deps/a2-validation-hardening-20261117]
+    branches: [fix/a2-docker-sheetjs-blockers-20261117]
 permissions:
   contents: read
 jobs:
