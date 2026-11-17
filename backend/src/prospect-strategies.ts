@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 import { domainToASCII } from "node:url";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { decryptProviderConfiguration } from "./credential-security.js";
 import { aiLeadFinderReadiness } from "./ai-web-search-policy.js";
 import { getProvider } from "./lead-providers.js";

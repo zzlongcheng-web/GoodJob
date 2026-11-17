@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { isForbiddenNetworkHostname } from "./provider-network-security.js";
 import type { LeadSourceTier, ProviderAccessMode } from "./types.js";
 

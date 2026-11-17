@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "zod/v3";
 import { randomUUID } from "node:crypto";
 import { callAiModel, extractJsonObject } from "./ai-model-runtime.js";
 import { CLI_SUMMARY_MODEL, runCliSummary } from "./cli-ai.js";
