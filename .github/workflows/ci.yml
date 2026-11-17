@@ -25,6 +25,14 @@ jobs:
       JWT_SECRET: goodjob-ci-jwt-secret-not-for-production-32-characters
     steps:
       - uses: actions/checkout@v4
+      - name: Archive tracked release source for offline analysis and handoff
+        if: startsWith(github.ref, 'refs/heads/release/')
+        run: git archive --format=zip --output=goodjob-crm-source.zip HEAD
+      - uses: actions/upload-artifact@v4
+        if: startsWith(github.ref, 'refs/heads/release/')
+        with:
+          name: golden-gain-release-source
+          path: goodjob-crm-source.zip
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
