@@ -144,8 +144,12 @@ install -d -m 0700 "$APP_ROOT/ops" "$runtime_dir"
 cp -a "$PACKAGE_ROOT/deploy/docker-compose/." "$runtime_dir/"
 chmod +x "$runtime_dir"/*.sh
 ln -sfn "$runtime_dir" "$APP_ROOT/ops/runtime"
-install -m 0700 "$PACKAGE_ROOT/deploy/docker-compose/baota-update.sh" \
-  "$APP_ROOT/ops/baota-update.sh"
+if [[ -f "$PACKAGE_ROOT/deploy/docker-compose/baota-update.sh" ]]; then
+  install -m 0700 "$PACKAGE_ROOT/deploy/docker-compose/baota-update.sh" \
+    "$APP_ROOT/ops/baota-update.sh"
+else
+  warn "当前源码未提供 baota-update.sh，跳过宝塔定时更新入口；试用期间请使用固定源码版本手动更新，禁止调用旧版自动更新脚本"
+fi
 
 log "清理旧应用镜像，仅保留当前版和上一版"
 for service in backend communication gateway; do
