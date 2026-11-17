@@ -2,7 +2,7 @@ name: GoodJob CRM CI
 
 on:
   push:
-    branches: [master]
+    branches: [master, release/golden-gain-candidate-20261117]
   pull_request:
     branches: [master]
   workflow_dispatch:
