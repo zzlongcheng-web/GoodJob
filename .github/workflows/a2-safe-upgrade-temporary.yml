@@ -31,7 +31,7 @@ jobs:
           npm --prefix whatsapp-plugin ci --no-audit --no-fund
           npm install --save-exact -w integration-worker \
             @modelcontextprotocol/client@2.4.0 \
-            @modelcontextprotocol/node@2.4.0 \
+            @modelcontextprotocol/node@2.1.2 \
             @modelcontextprotocol/server@2.4.0 \
             mysql2@3.24.6 zod@4.6.7
           npm install -w backend 'mysql2@^3.24.6'
@@ -40,8 +40,10 @@ jobs:
           node - <<'JS'
           const fs=require('node:fs');
           const w=JSON.parse(fs.readFileSync('integration-worker/package.json'));
-          for(const name of ['@modelcontextprotocol/client','@modelcontextprotocol/node','@modelcontextprotocol/server'])
+          for(const name of ['@modelcontextprotocol/client','@modelcontextprotocol/server'])
             if(w.dependencies[name]!=='2.4.0')throw new Error('MCP version mismatch: '+name);
+          // The upstream 2.4.0 release ships @modelcontextprotocol/node as 2.1.2
+          if(w.devDependencies['@modelcontextprotocol/node']!=='2.1.2')throw new Error('MCP node release matrix mismatch');
           if(w.dependencies.zod!=='4.6.7'||w.dependencies.mysql2!=='3.24.6')throw new Error('Worker version mismatch');
           console.log('MCP / mysql2 / zod alignment confirmed');
           JS
