@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { canonicalJsonStringify } from "./canonical-json.js";
 import { canonicalOrganizationId } from "./organization-identity-conflict-review.js";
 import { hasIamPermission } from "./auth.js";

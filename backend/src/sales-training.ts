@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { callAiModel } from "./ai-model-runtime.js";
 import { canSeeOwner, hasIamPermission, type IamActor } from "./auth.js";
 import type { CrmStore } from "./store.js";

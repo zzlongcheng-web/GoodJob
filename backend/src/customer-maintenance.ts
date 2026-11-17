@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { z } from "zod";
+import { z } from "zod/v3";
 import type { AgentActor } from "./ai-agent.js";
 import type { CrmStore } from "./store.js";
 import type { CustomerMaintenanceFinding, CustomerMaintenanceWatch, Todo } from "./types.js";

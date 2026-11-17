@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
-import { z } from "zod";
+import { z } from "zod/v3";
 import {
   activateProspectCampaign,
   createProspectCampaign,
