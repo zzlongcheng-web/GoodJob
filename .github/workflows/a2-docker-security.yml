@@ -1,7 +1,7 @@
 name: A2 Docker, Trivy and Zod memory evidence
 on:
   push:
-    branches: [fix/a2-docker-sheetjs-blockers-20261117]
+    branches: [release/golden-gain-candidate-20261117]
 permissions:
   contents: read
 jobs:
@@ -27,6 +27,21 @@ jobs:
           npm ci --no-audit --no-fund
           npm --prefix whatsapp-plugin ci --no-audit --no-fund
           npm run build
+      - name: Production dependency audit requires zero High and Critical
+        run: |
+          npm audit --omit=dev --json > a2-evidence/npm-root-prod.json || true
+          npm --prefix whatsapp-plugin audit --omit=dev --json > a2-evidence/npm-plugin-prod.json || true
+          node - <<'JS'
+          const fs=require('node:fs');
+          let high=0,critical=0;
+          for(const scope of ['root','plugin']){
+            const audit=JSON.parse(fs.readFileSync('a2-evidence/npm-'+scope+'-prod.json','utf8'));
+            const count=audit.metadata?.vulnerabilities||{};
+            console.log(scope,JSON.stringify(count));
+            high+=count.high||0; critical+=count.critical||0;
+          }
+          if(high||critical){console.error('RELEASE BLOCKED: production dependency audit has '+high+' High and '+critical+' Critical');process.exit(1);}
+          JS
       - name: Measure constrained Zod arrays at nearly 3MB without public traffic
         run: |
           set -o pipefail
@@ -65,20 +80,51 @@ jobs:
           output: a2-evidence/trivy-communication.json
           severity: HIGH,CRITICAL
           exit-code: '0'
-      - name: Release security gate (no Critical image findings)
+      - name: Release security gate (zero High and Critical image findings)
         run: |
           node - <<'JS'
           const fs=require('node:fs');
-          let critical=0;
+          let high=0, critical=0;
           for(const name of ['backend','communication']){
             const report=JSON.parse(fs.readFileSync('a2-evidence/trivy-'+name+'.json','utf8'));
             const vulnerabilities=(report.Results||[]).flatMap(r=>r.Vulnerabilities||[]);
             const counts=Object.fromEntries(['HIGH','CRITICAL'].map(s=>[s,vulnerabilities.filter(v=>v.Severity===s).length]));
             console.log(name,JSON.stringify(counts));
-            critical+=counts.CRITICAL;
+            high+=counts.HIGH; critical+=counts.CRITICAL;
           }
-          if(critical>0){console.error('RELEASE BLOCKED: '+critical+' Critical image findings; evidence preserved');process.exit(1);}
+          if(critical>0||high>0){console.error('RELEASE BLOCKED: '+high+' High, '+critical+' Critical image findings; evidence preserved');process.exit(1);}
           JS
+      - name: Verify final images contain no package manager or obsolete SheetJS
+        run: |
+          docker run --rm --entrypoint sh goodjobcrm-backend:a2-ci -ec '
+            test ! -e /usr/local/lib/node_modules/npm
+            test ! -e /usr/local/bin/npm
+            node -e "const p=require(\"./node_modules/xlsx/package.json\"); if(p.version!==\"0.20.3\") process.exit(1); console.log(\"production xlsx\",p.version)"
+          '
+          docker run --rm --entrypoint sh goodjobcrm-communication:a2-ci -ec '
+            test ! -e /usr/local/lib/node_modules/npm
+            test ! -e /usr/local/bin/npm
+            node --version
+          '
+      - name: Run Excel PDF pagination in production LibreOffice image
+        run: |
+          docker run --rm --mount type=bind,source="$PWD",target=/app --workdir /app/backend \
+            --env NODE_ENV=test \
+            --env JWT_SECRET=goodjob-rc-ci-only-secret-not-for-production-32-characters \
+            --env LIBREOFFICE_BIN=/usr/bin/soffice \
+            --env GOODJOB_FILE_ROOT=/tmp/rc-files \
+            --env GOODJOB_UPLOADS_DIR=/tmp/rc-uploads \
+            --entrypoint node goodjobcrm-backend:a2-ci \
+            /app/node_modules/tsx/dist/cli.mjs src/trade-document-excel-workflow-test.ts
+      - name: Capture immutable source archive
+        if: success()
+        run: |
+          git archive --format=zip --output=goodjob-crm-release-candidate-source.zip HEAD
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: goodjob-crm-release-candidate-source
+          path: goodjob-crm-release-candidate-source.zip
       - name: Store logs and findings including failed steps
         if: always()
         uses: actions/upload-artifact@v4
