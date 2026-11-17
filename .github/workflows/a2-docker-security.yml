@@ -80,12 +80,32 @@ jobs:
           output: a2-evidence/trivy-communication.json
           severity: HIGH,CRITICAL
           exit-code: '0'
+      - name: Pull pinned production MySQL image
+        run: docker pull mysql:8.4.13
+      - name: Trivy scan gateway image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: goodjobcrm-gateway:a2-ci
+          format: json
+          output: a2-evidence/trivy-gateway.json
+          severity: HIGH,CRITICAL
+          exit-code: '0'
+      - name: Trivy scan production MySQL image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: mysql:8.4.13
+          format: json
+          output: a2-evidence/trivy-mysql.json
+          severity: HIGH,CRITICAL
+          exit-code: '0'
       - name: Release security gate (zero High and Critical image findings)
         run: |
           node - <<'JS'
           const fs=require('node:fs');
           let high=0, critical=0;
-          for(const name of ['backend','communication']){
+          for(const name of ['backend','communication','gateway','mysql']){
             const report=JSON.parse(fs.readFileSync('a2-evidence/trivy-'+name+'.json','utf8'));
             const vulnerabilities=(report.Results||[]).flatMap(r=>r.Vulnerabilities||[]);
             const counts=Object.fromEntries(['HIGH','CRITICAL'].map(s=>[s,vulnerabilities.filter(v=>v.Severity===s).length]));
