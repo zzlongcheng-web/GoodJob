@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 import * as cheerio from "cheerio";
 import { strFromU8, unzipSync } from "fflate";
-import XLSX from "xlsx-js-style";
+import * as XLSX from "xlsx";
 import type {
   TradeDocument,
   TradeDocumentImportAnalysis,
