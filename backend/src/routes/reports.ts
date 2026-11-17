@@ -9,7 +9,7 @@ import { z } from "zod/v3";
 import { canSeeOwner, canSeePersonalData, requireAuth } from "../auth.js";
 import { type Customer, type Deal, type Todo } from "../types.js";
 import { getStore } from "../store.js";
-import { calculateMonthlyNewCustomerPerformance } from "../monthly-new-customer-performance.js";
+import { calculateMonthlyNewCustomerPerformance, currentPerformanceMonth } from "../monthly-new-customer-performance.js";
 import { buildManagementPerformance } from "../management-performance.js";
 import {
   archiveExpiredTodos,
@@ -163,7 +163,7 @@ export function registerReportsRoutes(app: Express) {
       user.role === "sales" && user.status === "active" && canSeeOwner(req.user!, user.id, user.teamId)
     ).map((user) => user.id);
     res.json(calculateMonthlyNewCustomerPerformance({
-      month: queryMonth || new Date().toISOString().slice(0, 7),
+      month: queryMonth || currentPerformanceMonth(),
       customers: scopedCustomers,
       activities: store.customerActivities,
       whatsappMessages: store.whatsappMessages,
@@ -624,7 +624,7 @@ export function registerReportsRoutes(app: Express) {
       .sort((left, right) => right.count - left.count || left.region.localeCompare(right.region));
     const visibleOwnerIds = new Set([...scopedCustomers.map((customer) => customer.ownerId), ...scopedDeals.map((deal) => deal.ownerId)]);
     const monthlyNewCustomerPerformance = calculateMonthlyNewCustomerPerformance({
-      month: now.toISOString().slice(0, 7),
+      month: currentPerformanceMonth(now),
       customers: scopedCustomers,
       activities: store.customerActivities,
       whatsappMessages: store.whatsappMessages
@@ -736,7 +736,7 @@ export function registerReportsRoutes(app: Express) {
       performanceTitle: scopeKey === "self" ? "个人经营效率" : "成员经营对比",
       performance,
       monthlyNewCustomerPerformance,
-      management: buildManagementPerformance(store, req.user!, (typeof requestedMonth === "string" ? requestedMonth : reportDate(now).slice(0, 7)), now),
+      management: buildManagementPerformance(store, req.user!, (typeof requestedMonth === "string" ? requestedMonth : currentPerformanceMonth(now)), now),
       riskRows,
       actions,
       definitions: [

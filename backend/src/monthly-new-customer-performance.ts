@@ -58,6 +58,13 @@ const monthFormatter = new Intl.DateTimeFormat("en-US", {
   timeZone: PERFORMANCE_TIMEZONE, year: "numeric", month: "2-digit"
 });
 
+export const PERFORMANCE_TIME_ZONE = PERFORMANCE_TIMEZONE;
+
+/** Current KPI month (YYYY-MM) in Beijing time; never derived from UTC or the server's local zone. */
+export function currentPerformanceMonth(now: Date = new Date()): string {
+  return beijingMonth(now.getTime());
+}
+
 function beijingMonth(at: number): string {
   const parts = monthFormatter.formatToParts(new Date(at));
   const year = parts.find((part) => part.type === "year")?.value;

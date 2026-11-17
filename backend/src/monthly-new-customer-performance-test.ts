@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { calculateMonthlyNewCustomerPerformance } from "./monthly-new-customer-performance.js";
+import { calculateMonthlyNewCustomerPerformance, currentPerformanceMonth } from "./monthly-new-customer-performance.js";
 
 const asOf = "2026-12-01T00:00:00.000Z";
 const month = "2026-11";
@@ -159,6 +159,11 @@ const future = report({
 assert.equal(future.members[0].qualifiedCount, 0);
 assert.throws(() => report({ reportMonth: "2026-13" }), /month must be/);
 assert.throws(() => report({ target: 0 }), /positive integer/);
+
+// Default KPI month follows Beijing time, not UTC.
+assert.equal(currentPerformanceMonth(new Date("2026-11-30T15:59:59Z")), "2026-11");
+assert.equal(currentPerformanceMonth(new Date("2026-11-30T16:00:00Z")), "2026-12");
+assert.equal(currentPerformanceMonth(new Date("2026-12-31T16:00:00Z")), "2027-01");
 
 console.log(JSON.stringify({
   ok: true, target61AndDedup: true, crossMonthFirstReply: true, historicalNotNew: true,
