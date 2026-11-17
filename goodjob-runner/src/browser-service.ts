@@ -9,7 +9,13 @@ import { createRequire } from "node:module";
 const DEFAULT_HOST = "127.0.0.1";
 const DEFAULT_PORT = 8931;
 const DEFAULT_CDP_PORT = 8933;
-const START_TIMEOUT_MS = 15_000;
+// 启动等待上限：生产保持 15 秒；测试环境（CI 共享 runner 冷启动 Chrome 很慢）放宽到 45 秒。
+// 可用 GOODJOB_BROWSER_START_TIMEOUT_MS 覆盖（限制在 5–120 秒）。
+function startTimeoutMs(env: NodeJS.ProcessEnv = process.env) {
+  const configured = Number(env.GOODJOB_BROWSER_START_TIMEOUT_MS);
+  if (Number.isFinite(configured) && configured > 0) return Math.min(120_000, Math.max(5_000, Math.round(configured)));
+  return env.NODE_ENV === "test" ? 45_000 : 15_000;
+}
 const require = createRequire(import.meta.url);
 
 export interface BrowserServiceConfiguration {
@@ -112,14 +118,20 @@ export function isBrowserServiceReachable(configuration = browserServiceConfigur
   return isPortReachable(configuration.host, configuration.port, timeoutMs);
 }
 
-export async function isBrowserCdpReady(configuration = browserServiceConfiguration(), timeoutMs = 1_500) {
+async function probeBrowserCdp(configuration: BrowserServiceConfiguration, timeoutMs: number): Promise<{ ready: boolean; error: string }> {
   try {
     const response = await fetch(`${configuration.cdpUrl}/json/version`, { signal: AbortSignal.timeout(timeoutMs) });
     const value = await response.json() as Record<string, unknown>;
-    return response.ok && typeof value.webSocketDebuggerUrl === "string";
-  } catch {
-    return false;
+    if (!response.ok) return { ready: false, error: `HTTP ${response.status}` };
+    if (typeof value.webSocketDebuggerUrl !== "string") return { ready: false, error: "响应缺少 webSocketDebuggerUrl" };
+    return { ready: true, error: "" };
+  } catch (error) {
+    return { ready: false, error: error instanceof Error ? `${error.name}: ${error.message}` : String(error) };
   }
+}
+
+export async function isBrowserCdpReady(configuration = browserServiceConfiguration(), timeoutMs = 1_500) {
+  return (await probeBrowserCdp(configuration, timeoutMs)).ready;
 }
 
 export async function isBrowserMcpReady(
@@ -208,14 +220,19 @@ export async function startBrowserService(
   const captureBrowser = (chunk: Buffer) => { browserDiagnostics = `${browserDiagnostics}${chunk.toString("utf8")}`.slice(-6_000); };
   browserChild.stdout?.on("data", captureBrowser);
   browserChild.stderr?.on("data", captureBrowser);
-  const browserDeadline = Date.now() + START_TIMEOUT_MS;
+  const browserDeadline = Date.now() + startTimeoutMs();
+  let lastProbe = { ready: false, error: "尚未探测" };
   while (Date.now() < browserDeadline && browserChild.exitCode === null && !browserChild.signalCode) {
-    if (await isBrowserCdpReady(configuration, 500)) break;
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    lastProbe = await probeBrowserCdp(configuration, 2_000);
+    if (lastProbe.ready) break;
+    await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  if (!(await isBrowserCdpReady(configuration, 1_000))) {
+  if (!lastProbe.ready) lastProbe = await probeBrowserCdp(configuration, 3_000);
+  if (!lastProbe.ready) {
+    const exited = browserChild.exitCode !== null || browserChild.signalCode
+      ? `；Chrome 进程已退出（code=${browserChild.exitCode} signal=${browserChild.signalCode}）` : "";
     await stopChild(browserChild);
-    throw new Error(`独立 Chrome 启动失败${browserDiagnostics.trim() ? `：${browserDiagnostics.trim()}` : ""}`);
+    throw new Error(`独立 Chrome 启动失败（CDP ${configuration.cdpUrl}，最后一次探测：${lastProbe.error}${exited}）${browserDiagnostics.trim() ? `：${browserDiagnostics.trim()}` : ""}`);
   }
 
   const args = [
@@ -245,7 +262,7 @@ export async function startBrowserService(
   child.stdout?.on("data", capture);
   child.stderr?.on("data", capture);
 
-  const deadline = Date.now() + START_TIMEOUT_MS;
+  const deadline = Date.now() + startTimeoutMs();
   while (Date.now() < deadline && child.exitCode === null && !child.signalCode) {
     if (await isBrowserMcpReady(configuration, 500)) break;
     await new Promise((resolve) => setTimeout(resolve, 150));

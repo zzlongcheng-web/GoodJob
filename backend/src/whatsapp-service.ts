@@ -1,11 +1,10 @@
-import whatsappWeb from "whatsapp-web.js";
+// 安全加固：whatsapp-web.js（非官方扫码通道，带 puppeteer/Chromium 依赖链）仅用于非生产测试，
+// 因此只做类型导入，运行时在 createClient 里懒加载；生产镜像用 `npm ci --omit=dev` 构建，不包含该包。
 import type { Client as WhatsAppClient, Message } from "whatsapp-web.js";
 import qrcode from "qrcode-terminal";
 import twilio from "twilio";
 import { randomBytes } from "node:crypto";
 import type { WhatsAppBinding, WhatsAppMessage } from "./types.js";
-
-const { Client, LocalAuth } = whatsappWeb;
 
 // WhatsApp Web 客户端管理器
 class WhatsAppWebManager {
@@ -17,6 +16,11 @@ class WhatsAppWebManager {
 
   // 创建新的 WhatsApp Web 客户端
   async createClient(_userId: string): Promise<string> {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("WhatsApp Web 扫码通道在生产环境不可用，请使用官方 WhatsApp Business API");
+    }
+    const { default: whatsappWeb } = await import("whatsapp-web.js");
+    const { Client, LocalAuth } = whatsappWeb;
     const clientId = `wa_web_${randomBytes(24).toString("base64url")}`;
 
     const client = new Client({
