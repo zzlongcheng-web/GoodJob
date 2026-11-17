@@ -8,7 +8,7 @@
  */
 import { app, startServer } from "./server-core.js";
 import { type NextFunction, type Request, type Response } from "express";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { EngineUnavailableError } from "./ai-engine-service.js";
 import { MysqlDataImportError } from "./mysql-data-import.js";
 import { registerSwagger } from "./swagger.js";

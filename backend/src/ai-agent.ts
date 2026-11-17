@@ -1,5 +1,5 @@
 import { createHash, createHmac, randomUUID } from "node:crypto";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { callGovernedAgentModel } from "./agent-model-governance.js";
 import { extractJsonObject } from "./ai-model-runtime.js";
 import {
