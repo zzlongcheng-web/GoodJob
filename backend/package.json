@@ -148,7 +148,8 @@
     "tldts": "^7.4.9",
     "twilio": "^6.0.2",
     "zod": "^4.6.7",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+    "xlsx-js-style": "^1.2.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
