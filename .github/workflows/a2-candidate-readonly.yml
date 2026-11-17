@@ -32,6 +32,12 @@ jobs:
           npm --prefix whatsapp-plugin ci --no-audit --no-fund
           npm run build
           npm test
+          mkdir -p a2-evidence
+          cp package-lock.json a2-evidence/stage1-package-lock.json
+          cp backend/package.json a2-evidence/stage1-backend-package.json
+          cp frontend/package.json a2-evidence/stage1-frontend-package.json
+          cp integration-worker/package.json a2-evidence/stage1-worker-package.json
+          npm audit --omit=dev --json > a2-evidence/stage1-root-prod.json || true
       - name: Nodemailer 10 candidate and mail regressions
         run: |
           npm install -w backend 'nodemailer@^10.0.0'
@@ -41,6 +47,9 @@ jobs:
           npm run test:email-delivery --workspace backend
           npm run test:prospect-outreach:http --workspace backend
           npm test
+          cp package-lock.json a2-evidence/stage2-package-lock.json
+          cp backend/package.json a2-evidence/stage2-backend-package.json
+          npm audit --omit=dev --json > a2-evidence/stage2-root-prod.json || true
       - name: Capture source-backed audit and patch
         if: always()
         run: |
