@@ -1,0 +1,27 @@
+# Hardened runtime built from the supported Oracle Linux / MySQL 8.4 LTS image.
+# The upstream MySQL shell and precompiled Go-based gosu are not required by
+# the CRM database server but introduce vulnerable Python and Go components.
+# Replace the one privilege-drop call in the upstream entrypoint with the
+# maintained util-linux runuser and preserve the complete MySQL 8.4 server.
+FROM mysql:8.4.13
+
+USER root
+RUN set -eux; \
+    microdnf install -y util-linux; \
+    microdnf clean all; \
+    command -v runuser; \
+    command -v mysqld; \
+    command -v mysqladmin; \
+    grep -F 'exec gosu mysql "$BASH_SOURCE" "$@"' /usr/local/bin/docker-entrypoint.sh; \
+    sed -i 's/exec gosu mysql "\$BASH_SOURCE" "\$@"/exec runuser -u mysql -- "\$BASH_SOURCE" "\$@"/' /usr/local/bin/docker-entrypoint.sh; \
+    grep -F 'exec runuser -u mysql -- "$BASH_SOURCE" "$@"' /usr/local/bin/docker-entrypoint.sh; \
+    ! grep -q 'exec gosu mysql' /usr/local/bin/docker-entrypoint.sh; \
+    rm -rf /usr/lib/mysqlsh /usr/bin/mysqlsh /usr/local/bin/gosu; \
+    test ! -e /usr/local/bin/gosu; \
+    test ! -e /usr/lib/mysqlsh; \
+    command -v mysqld; \
+    command -v mysqladmin
+
+# Inherits the official entrypoint, data volume, listening port, and health
+# configuration. It must still pass first-run initialization and restart
+# smoke tests plus the Trivy zero-High/zero-Critical release gate.
