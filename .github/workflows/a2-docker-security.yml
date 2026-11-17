@@ -65,6 +65,20 @@ jobs:
           output: a2-evidence/trivy-communication.json
           severity: HIGH,CRITICAL
           exit-code: '0'
+      - name: Release security gate (no Critical image findings)
+        run: |
+          node - <<'JS'
+          const fs=require('node:fs');
+          let critical=0;
+          for(const name of ['backend','communication']){
+            const report=JSON.parse(fs.readFileSync('a2-evidence/trivy-'+name+'.json','utf8'));
+            const vulnerabilities=(report.Results||[]).flatMap(r=>r.Vulnerabilities||[]);
+            const counts=Object.fromEntries(['HIGH','CRITICAL'].map(s=>[s,vulnerabilities.filter(v=>v.Severity===s).length]));
+            console.log(name,JSON.stringify(counts));
+            critical+=counts.CRITICAL;
+          }
+          if(critical>0){console.error('RELEASE BLOCKED: '+critical+' Critical image findings; evidence preserved');process.exit(1);}
+          JS
       - name: Store logs and findings including failed steps
         if: always()
         uses: actions/upload-artifact@v4

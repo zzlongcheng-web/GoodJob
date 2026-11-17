@@ -69,7 +69,8 @@ jobs:
           }
           fs.writeFileSync('a2-evidence/compare.json',JSON.stringify(counts,null,2));
           if(Object.values(counts).some(v=>v.candidate.critical>0)) {
-             console.log('BLOCKED: Candidate still has Critical; do not promote Docker base');
+             console.error('RELEASE BLOCKED: Debian13 candidate still has Critical; do not promote Docker base');
+             process.exitCode=1;
           }
           JS
       - if: always()
