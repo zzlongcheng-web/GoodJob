@@ -1,0 +1,71 @@
+name: A2 safe same-major dependency upgrades (temporary)
+on:
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  upgrade:
+    if: github.head_ref == 'deps/hardening-20261117'
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      CI: 'true'
+      NODE_ENV: test
+      JWT_SECRET: goodjob-ci-jwt-secret-not-for-production-32-characters
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: deps/hardening-20261117
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Upgrade only task-approved same-major packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm --prefix whatsapp-plugin ci --no-audit --no-fund
+          npm install --save-exact -w integration-worker \
+            @modelcontextprotocol/client@2.4.0 \
+            @modelcontextprotocol/node@2.4.0 \
+            @modelcontextprotocol/server@2.4.0 \
+            mysql2@3.24.6 zod@4.6.7
+          npm install -w backend 'mysql2@^3.24.6'
+          npm install -D -w frontend 'vite@^6.4.3'
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          node - <<'JS'
+          const fs=require('node:fs');
+          const w=JSON.parse(fs.readFileSync('integration-worker/package.json'));
+          for(const name of ['@modelcontextprotocol/client','@modelcontextprotocol/node','@modelcontextprotocol/server'])
+            if(w.dependencies[name]!=='2.4.0')throw new Error('MCP version mismatch: '+name);
+          if(w.dependencies.zod!=='4.6.7'||w.dependencies.mysql2!=='3.24.6')throw new Error('Worker version mismatch');
+          console.log('MCP / mysql2 / zod alignment confirmed');
+          JS
+      - name: Regression gate before write
+        run: |
+          npm run build
+          npm test
+      - name: Verify changed-file allowlist and commit only passing dependency changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'Changed files:'
+          git diff --name-only
+          unexpected="$(git diff --name-only | grep -Ev '^(package-lock.json|backend/package.json|integration-worker/package.json|frontend/package.json|whatsapp-plugin/package.json|whatsapp-plugin/package-lock.json)$' || true)"
+          if [ -n "$unexpected" ]; then
+            echo "UNEXPECTED changed files: $unexpected"
+            exit 1
+          fi
+          git add backend/package.json integration-worker/package.json frontend/package.json package-lock.json
+          if git diff --cached --quiet; then
+            echo 'No package changes'
+            exit 0
+          fi
+          git config user.name 'golden-gain-a2-ci'
+          git config user.email 'golden-gain-a2-ci@users.noreply.github.com'
+          git commit -m 'fix(deps): align MCP, mysql2, worker zod and frontend vite'
+          git push origin HEAD:refs/heads/deps/hardening-20261117
