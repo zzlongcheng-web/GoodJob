@@ -99,6 +99,19 @@ jobs:
             test ! -e /usr/lib/mysqlsh
             grep -F "exec runuser -u mysql --" /usr/local/bin/docker-entrypoint.sh
           '
+      - name: Hardened MySQL initial database startup smoke
+        run: |
+          docker run -d --rm --name mysql-rc-smoke \
+            -e MYSQL_ROOT_PASSWORD=ci-only-mysql-rc-test \
+            goodjobcrm-mysql:a2-ci --disable-log-bin
+          for count in $(seq 1 60); do
+            if docker exec mysql-rc-smoke sh -c 'MYSQL_PWD=ci-only-mysql-rc-test mysql -uroot -Nse "SELECT 1"' >/dev/null 2>&1; then
+              break
+            fi
+            sleep 2
+          done
+          test "$(docker exec mysql-rc-smoke sh -c 'MYSQL_PWD=ci-only-mysql-rc-test mysql -uroot -Nse "SELECT @@global.log_bin"')" = "0"
+          docker stop mysql-rc-smoke
       - name: Trivy scan production MySQL image
         uses: aquasecurity/trivy-action@v0.36.0
         with:
