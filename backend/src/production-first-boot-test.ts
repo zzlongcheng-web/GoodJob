@@ -55,6 +55,11 @@ try {
   }
 }
 
+// Backup and restore must include the AES key and encrypted settings as a pair.
+for (const name of ["backup.sh", "restore.sh"]) {
+  assert.ok(readFileSync(resolve("../deploy/docker-compose", name), "utf8").includes("website-lead-private.tar.gz"));
+}
+
 const privateDir = mkdtempSync(join(tmpdir(), "goodjob-website-firstboot-"));
 try {
   const cli = resolve("dist/bootstrap-website-lead-ingress.js");

@@ -48,6 +48,13 @@ fi
 log "备份上传文件、Logo、公章、签名与 Communication 媒体"
 archive_volume goodjobcrm_uploads_data uploads.tar.gz
 archive_volume goodjobcrm_communication_media communication-media.tar.gz
+# Ingress HMAC keys must be restored together with MySQL and application secrets.
+# Existing older installations may not have the private volume yet.
+if docker volume inspect goodjobcrm_website_lead_private_data >/dev/null 2>&1; then
+  archive_volume goodjobcrm_website_lead_private_data website-lead-private.tar.gz
+else
+  warn "官网询盘私有卷尚不存在，未备份该组件"
+fi
 
 cp -p "$ENV_FILE" "$target/deploy.env"
 cp -a "$SECRETS_DIR" "$target/secrets"

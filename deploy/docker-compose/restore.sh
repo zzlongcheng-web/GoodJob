@@ -18,6 +18,11 @@ target="$(cd "$target" && pwd)"
 gzip -t "$target/mysql.sql.gz" || die "MySQL 备份压缩文件已损坏"
 gzip -t "$target/uploads.tar.gz" || die "上传文件备份已损坏"
 gzip -t "$target/communication-media.tar.gz" || die "Communication 媒体备份已损坏"
+if [[ -s "$target/website-lead-private.tar.gz" ]]; then
+  gzip -t "$target/website-lead-private.tar.gz" || die "官网询盘私有配置备份已损坏"
+else
+  warn "这是不含官网询盘密钥的旧备份；恢复后必须验证并重新配置网站询盘入口"
+fi
 
 legacy_postgres_started=false
 cleanup_legacy_postgres() {
@@ -56,6 +61,9 @@ gzip -dc "$target/mysql.sql.gz" | compose exec -T mysql sh -ec \
 log "恢复上传文件与 Communication 媒体"
 restore_volume goodjobcrm_uploads_data uploads.tar.gz
 restore_volume goodjobcrm_communication_media communication-media.tar.gz
+if [[ -s "$target/website-lead-private.tar.gz" ]]; then
+  restore_volume goodjobcrm_website_lead_private_data website-lead-private.tar.gz
+fi
 
 compose --profile tools run --rm backend-migrate
 compose --profile tools run --rm communication-migrate
