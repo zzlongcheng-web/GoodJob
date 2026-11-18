@@ -34,9 +34,39 @@ jobs:
           npm ci
           npm --prefix whatsapp-plugin ci
       - name: Compile all workspaces and WhatsApp plugin
-        run: npm run build
+        id: build
+        run: |
+          set -o pipefail
+          npm run build 2>&1 | tee build.log
       - name: Run project self-tests
-        run: npm test
+        id: self-test
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee self-test.log
+      - name: Publish build and self-test summary
+        if: always()
+        env:
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+          SELF_TEST_OUTCOME: ${{ steps.self-test.outcome }}
+        run: |
+          {
+            echo "## Build and self-tests"
+            echo ""
+            echo "- Branch: \`$GITHUB_REF_NAME\`"
+            echo "- Commit: \`$GITHUB_SHA\`"
+            echo "- Build: \`${BUILD_OUTCOME:-not run}\`"
+            echo "- Self-tests: \`${SELF_TEST_OUTCOME:-not run}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload build and self-test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: goodjob-ci-${{ github.run_id }}-${{ github.run_attempt }}-build-self-test
+          path: |
+            build.log
+            self-test.log
+          if-no-files-found: warn
+          retention-days: 14
 
   mysql-tests:
     name: MySQL integration tests
@@ -90,4 +120,27 @@ jobs:
           EOF
           chmod 600 .env.test.local
       - name: Run independent MySQL test suite
-        run: npm run test:mysql
+        id: mysql-test
+        run: |
+          set -o pipefail
+          npm run test:mysql 2>&1 | tee mysql-test.log
+      - name: Publish MySQL test summary
+        if: always()
+        env:
+          MYSQL_TEST_OUTCOME: ${{ steps.mysql-test.outcome }}
+        run: |
+          {
+            echo "## MySQL integration tests"
+            echo ""
+            echo "- Branch: \`$GITHUB_REF_NAME\`"
+            echo "- Commit: \`$GITHUB_SHA\`"
+            echo "- Result: \`${MYSQL_TEST_OUTCOME:-not run}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload MySQL test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: goodjob-ci-${{ github.run_id }}-${{ github.run_attempt }}-mysql
+          path: mysql-test.log
+          if-no-files-found: warn
+          retention-days: 14
