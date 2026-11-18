@@ -12,6 +12,9 @@ assert.equal(legacyPermissionScope("sales", "customer.export"), "self");
 assert.equal(legacyPermissionScope("manager", "customer.export"), "org_subtree");
 assert.equal(legacyPermissionScope("admin", "role.manage"), "tenant");
 assert.equal(legacyPermissionScope("sales", "customer.pool.claim"), "public_pool");
+assert.equal(legacyPermissionScope("sales", "customer.activity.delete"), null);
+assert.equal(legacyPermissionScope("manager", "customer.activity.delete"), null);
+assert.equal(legacyPermissionScope("admin", "customer.activity.delete"), "tenant");
 assert.ok(IAM_PERMISSION_CATALOG.every((item) => item.code.includes(".") && item.scopeModes.length > 0));
 
 console.log(JSON.stringify({
