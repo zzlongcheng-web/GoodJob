@@ -27,6 +27,7 @@ export const IAM_PERMISSION_CATALOG: IamPermissionDefinition[] = [
   { code: "customer.create", module: "客户", name: "创建客户", riskLevel: "normal", scopeModes: ["self", "org_unit", "tenant"] },
   { code: "customer.update", module: "客户", name: "维护客户", riskLevel: "normal", scopeModes: ["self", "org_unit", "org_subtree", "tenant"] },
   { code: "customer.delete", module: "客户", name: "删除客户", riskLevel: "high", scopeModes: ["self", "org_subtree", "tenant"] },
+  { code: "customer.activity.delete", module: "客户", name: "删除客户沟通记录", riskLevel: "critical", scopeModes: ["org_subtree", "tenant"] },
   { code: "customer.assign", module: "客户", name: "分配客户", riskLevel: "sensitive", scopeModes: ["org_unit", "org_subtree", "tenant"] },
   { code: "customer.export", module: "客户", name: "导出客户", riskLevel: "critical", scopeModes: ["self", "org_subtree", "tenant"] },
   { code: "customer.pool.claim", module: "客户", name: "领取公池客户", riskLevel: "normal", scopeModes: ["public_pool"] },
