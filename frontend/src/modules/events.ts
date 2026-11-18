@@ -6,7 +6,6 @@
  */
 import { type IntegrationCenterController, mountIntegrationCenter } from "../integrations/integration-center";
 import { closeModal, openModal, state } from "../prototype-api";
-import { qs } from "./shared";
 import { api, toast } from "./ui";
 import { hasIamCapability } from "./auth";
 import { MAIL_SECTION_ITEMS } from "./mail-center";
@@ -22,23 +21,6 @@ export function installIntegrationCenterInteractions() {
     hasPermission: hasIamCapability,
     permissionScopes: (permissionCode) => state.iamCapabilities?.permissions[permissionCode] || []
   });
-}
-
-/** 登录页默认账号（静默内嵌用）：默认管理员 */
-const DEFAULT_LOGIN_EMAIL = "admin@goodjob.com";
-const DEFAULT_LOGIN_PASSWORD = "goodjob123";
-
-/**
- * 登录页默认账号静默内嵌：打开登录页时把默认管理员账号密码填进输入框。
- * 只在输入框为空时填充，不清空用户已输入内容；页面上不展示任何明文提示块。
- */
-export function prefillLoginCredentials() {
-  if (document.body.classList.contains("is-authenticated")) return;
-  const emailInput = qs<HTMLInputElement>("#loginEmail");
-  const passwordInput = qs<HTMLInputElement>("#loginPassword");
-  if (!emailInput || !passwordInput) return;
-  if (!emailInput.value.trim()) emailInput.value = DEFAULT_LOGIN_EMAIL;
-  if (!passwordInput.value) passwordInput.value = DEFAULT_LOGIN_PASSWORD;
 }
 
 /** 邮件中心的子视图在「最近打开」里共用一个页签，别把一节拆成四个标签 */

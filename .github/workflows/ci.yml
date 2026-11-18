@@ -4,7 +4,7 @@ on:
   push:
     branches: [master, release/golden-gain-candidate-20261117]
   pull_request:
-    branches: [master]
+    branches: [master, release/golden-gain-candidate-20261117]
   workflow_dispatch:
 
 permissions:
