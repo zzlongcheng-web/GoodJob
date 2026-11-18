@@ -129,6 +129,8 @@ services:
       GOODJOB_UPLOADS_DIR: /app/uploads
       MYSQL_LOCAL_BACKUP_ENABLED: "false"
       GOODJOB_RELEASE_ID: ${GOODJOB_RELEASE_ID}
+    volumes:
+      - website_lead_private_data:/app/backend/.data/private
     secrets: &backend_secrets
       - mysql_password
       - initial_admin_password
@@ -200,6 +202,7 @@ services:
       - private
     volumes:
       - uploads_data:/app/uploads
+      - website_lead_private_data:/app/backend/.data/private
     expose:
       - "4188"
     depends_on:
@@ -297,6 +300,8 @@ volumes:
     name: goodjobcrm_communication_media
   uploads_data:
     name: goodjobcrm_uploads_data
+  website_lead_private_data:
+    name: goodjobcrm_website_lead_private_data
 
 networks:
   private:

@@ -656,6 +656,8 @@ export async function createMysqlStore(
       ? await acquireProductionInstanceLock(pool, processRole)
       : null;
   await ensureSchema(pool);
+  await ensureInitialSuperAdmin(pool);
+  await disableLegacyBuiltInSuperAdmin(pool);
   await ensureIamFoundationSchema(pool);
   await ensureApprovalSchema(pool);
   await ensureApprovalIndexes(pool);
@@ -677,7 +679,6 @@ export async function createMysqlStore(
   await ensureKnowledgeGovernanceSchema(pool);
   await ensureAppSettingsSchema(pool);
   await ensureAiEngineSchema(pool);
-  await ensureBuiltInSuperAdmin(pool);
   setAppSettingsPool(pool);
   setAiEngineJobRepository(new MysqlAiEngineJobRepository(pool));
   setIntegrationRepository(new MysqlIntegrationControlRepository(pool));
@@ -2188,65 +2189,43 @@ export async function createMysqlStore(
 
 export const GOODJOB_MYSQL_SCHEMA_VERSION = "1.4.31-lead-assignment";
 
-/** 内置超级管理员（公司最高权限账号）：可登录、管理账号、一键批量生成带有效期的体验账号 */
-const BUILT_IN_SUPERADMIN = {
-  id: "u_superadmin",
-  email: "superadmin@goodjob.com",
-  name: "超级管理员",
-  password: "969940360Dx",
-  avatar: "SA",
-  /** 注意：不能给 super_admin 角色——那是「平台运维身份」，按设计禁止访问公司业务数据（账号管理接口会 401/403） */
-  role: "admin",
-  teamId: "europe"
-} as const;
-
 /**
- * 幂等播种内置超级管理员：
- * - 邮箱不存在 → 插入；
- * - 已存在但角色/团队不是预期值 → 修正（仅纠这三列，不动密码与其他资料，用户改过的密码仍生效）。
+ * Provision the company's explicitly configured platform admin only on a new installation.
+ * A previously seeded legacy built-in account does not count as a real company account.
+ * Never modify passwords or reactivate an existing account during an upgrade.
  */
-export async function ensureBuiltInSuperAdmin(pool: mysql.Pool) {
-  const [rows] = await pool.query<mysql.RowDataPacket[]>(
-    "SELECT id, role, team_id FROM users WHERE email = ? LIMIT 1",
-    [BUILT_IN_SUPERADMIN.email]
+export async function ensureInitialSuperAdmin(pool: mysql.Pool): Promise<boolean> {
+  if (process.env.NODE_ENV !== "production") return false;
+  const email = (process.env.INITIAL_ADMIN_EMAIL || "").trim().toLowerCase();
+  const password = process.env.INITIAL_ADMIN_PASSWORD || "";
+  if (!/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,63}$/.test(email)
+    || /@(?:goodjob|goodjob-crm)\.com$/i.test(email)
+    || password.length < 12) {
+    throw new Error("Production first-boot admin requires a company email and a password of at least 12 characters.");
+  }
+  const initialId = "u_initial_super_admin";
+  const [existing] = await pool.query<mysql.RowDataPacket[]>(
+    "SELECT id FROM users WHERE id = ? OR email = ? LIMIT 2", [initialId, email]
   );
-  let existing = (rows as Array<{ id: string; role: string; team_id: string }>)[0];
-  if (!existing) {
-    // 内置超管可能被改过邮箱（线上 ECORECRM 镜像就把 u_superadmin 的邮箱改成了 1@qq.com），
-    // 此时 id 仍被占用：再按 id 插入会撞主键，导致后端启动直接失败。沿用它，只纠正角色/团队，
-    // 邮箱与密码保持用户当前值。
-    const [byIdRows] = await pool.query<mysql.RowDataPacket[]>(
-      "SELECT id, role, team_id FROM users WHERE id = ? LIMIT 1",
-      [BUILT_IN_SUPERADMIN.id]
-    );
-    existing = (byIdRows as Array<{ id: string; role: string; team_id: string }>)[0];
-  }
-  if (!existing) {
-    await pool.query(
-      `INSERT INTO users (id, name, email, password_hash, role, team_id, avatar, status, auth_version)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'active', 1)`,
-      [
-        BUILT_IN_SUPERADMIN.id,
-        BUILT_IN_SUPERADMIN.name,
-        BUILT_IN_SUPERADMIN.email,
-        await hashPassword(BUILT_IN_SUPERADMIN.password),
-        BUILT_IN_SUPERADMIN.role,
-        BUILT_IN_SUPERADMIN.teamId,
-        BUILT_IN_SUPERADMIN.avatar
-      ]
-    );
-    return true;
-  }
-  if (existing.role !== BUILT_IN_SUPERADMIN.role || existing.team_id !== BUILT_IN_SUPERADMIN.teamId) {
-    // 用 id 定位：按 id 兜底找到的记录邮箱可能已被改过，用 email 当条件是空更新。
-    await pool.query("UPDATE users SET role = ?, team_id = ? WHERE id = ?", [
-      BUILT_IN_SUPERADMIN.role,
-      BUILT_IN_SUPERADMIN.teamId,
-      existing.id
-    ]);
-    return true;
-  }
-  return false;
+  if (existing.length) return false;
+  const [counts] = await pool.query<mysql.RowDataPacket[]>(
+    "SELECT COUNT(*) AS total FROM users WHERE id <> 'u_superadmin'"
+  );
+  if (Number(counts[0]?.total || 0) !== 0) return false;
+  await pool.query(
+    `INSERT INTO users (id, name, email, password_hash, role, team_id, avatar, status, auth_version)
+     VALUES (?, ?, ?, ?, 'super_admin', 'all', 'SA', 'active', 1)`,
+    [initialId, (process.env.INITIAL_ADMIN_NAME || "Golden Gain Admin").slice(0, 100), email, await hashPassword(password)]
+  );
+  return true;
+}
+
+/** Disable the previous hard-coded credential without deleting business data. Idempotent. */
+export async function disableLegacyBuiltInSuperAdmin(pool: mysql.Pool): Promise<boolean> {
+  const [result] = await pool.query<mysql.ResultSetHeader>(
+    "UPDATE users SET status = 'disabled', auth_version = auth_version + 1 WHERE id = 'u_superadmin' AND status <> 'disabled'"
+  );
+  return result.affectedRows > 0;
 }
 
 const MIGRATION_PROTECTED_TABLES = ["users", "customers", "leads", "deals"] as const;
@@ -2318,6 +2297,9 @@ export async function migrateMysqlSchema(input: {
     const before = await mysqlSchemaStats(pool);
     const protectedBefore = await protectedMigrationRowCounts(pool);
     await ensureSchema(pool);
+    const seededInitialSuperadmin = await ensureInitialSuperAdmin(pool);
+    if (seededInitialSuperadmin && protectedBefore.users !== undefined) protectedBefore.users += 1;
+    const disabledLegacyBuiltInSuperadmin = await disableLegacyBuiltInSuperAdmin(pool);
     await ensureIamFoundationSchema(pool);
     await ensureApprovalSchema(pool);
     await ensureApprovalIndexes(pool);
@@ -2352,7 +2334,6 @@ export async function migrateMysqlSchema(input: {
         throw new Error(`迁移前后核心业务表 ${table} 行数不一致，已停止启动新版本`);
       }
     }
-    const seededBuiltInSuperadmin = await ensureBuiltInSuperAdmin(pool);
     await pool.query(
       `INSERT INTO goodjob_schema_migrations
         (schema_version, release_id, tables_before, tables_after, columns_before, columns_after, applied_at)
@@ -2382,7 +2363,8 @@ export async function migrateMysqlSchema(input: {
       repairedKnowledgeAssetTeams: knowledgeAssetTeamRepair.assets,
       knowledgeAssetOrphans: knowledgeAssetTeamRepair.orphans,
       knowledgeAssetOrphanIds: knowledgeAssetTeamRepair.orphanIds,
-      seededBuiltInSuperadmin,
+      seededInitialSuperadmin,
+      disabledLegacyBuiltInSuperadmin,
       protectedRowsVerified: Object.keys(protectedBefore).length
     };
   } finally {

@@ -81,6 +81,12 @@ compose --profile tools run --rm backend-migrate
 assert_mysql_binlog_disabled
 compose --profile tools run --rm communication-migrate
 
+# Bootstrap encrypted HMAC ingress settings inside a persistent Docker volume.
+# The initial platform admin is not a business lead owner: signed web leads
+# remain refused until an authorized business user is explicitly configured.
+log "初始化持久化官网询盘签名密钥（默认不对接外部网站）"
+compose --profile tools run --rm backend-migrate node backend/dist/bootstrap-website-lead-ingress.js
+
 # 安全修复：默认不再创建 50 个 beta-admin 测试管理员账号；仅在明确需要时设置 GOODJOB_PROVISION_BETA_ADMINS=true
 if [[ "${GOODJOB_PROVISION_BETA_ADMINS:-false}" == "true" ]]; then
   log "预置 50 个团队管理员（凭据只保存在 $SECRETS_DIR/admin_credentials.tsv）"

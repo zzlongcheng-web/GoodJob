@@ -49,7 +49,7 @@ COPY agent-skills agent-skills
 COPY deploy/fontconfig deploy/fontconfig
 COPY deploy/docker-compose/backend-entrypoint.sh /usr/local/bin/goodjob-backend-entrypoint
 RUN chmod 0755 /usr/local/bin/goodjob-backend-entrypoint \
-    && install -d -o node -g node -m 0700 /app/uploads \
+    && install -d -o node -g node -m 0700 /app/uploads /app/backend/.data/private \
     && chown -R node:node /app /home/node
 
 USER node
