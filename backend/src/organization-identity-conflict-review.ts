@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { canonicalJsonStringify } from "./canonical-json.js";
 import { hasIamPermission } from "./auth.js";
 import type { CrmStore } from "./store.js";

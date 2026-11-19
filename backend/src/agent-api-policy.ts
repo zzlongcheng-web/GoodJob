@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "zod/v3";
 import type { AgentRisk } from "./ai-agent.js";
 
 export const agentApiRequestSchema = z.object({

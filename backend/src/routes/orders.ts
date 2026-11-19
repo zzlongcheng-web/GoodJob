@@ -5,7 +5,7 @@
  * 共享逻辑与全局中间件在 ../server-core.ts。
  */
 import type { Express } from "express";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { canSeeOwner, hasIamPermission, requireAuth } from "../auth.js";
 import { getFileRepository, isPreviewable } from "../file-storage.js";
 import { isHeicFile, isOfficeFile } from "../file-derive.js";

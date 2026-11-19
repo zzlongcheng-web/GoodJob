@@ -9,7 +9,7 @@ import express from "express";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { exportAdvancedDocumentTemplate, listAdvancedDocumentTemplates } from "../advanced-document-templates.js";
 import { excelBufferSha256, ExcelPreviewUnavailableError, renderExcelBufferToPdf } from "../excel-preview.js";
 import { createTradeDocumentImportAnalysis, parseTradeDocumentImport, TRADE_DOCUMENT_IMPORT_MAX_BYTES, tradeDocumentImportSha256 } from "../trade-document-import.js";

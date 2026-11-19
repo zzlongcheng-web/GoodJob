@@ -35,7 +35,9 @@ COPY integration-sdk/package.json integration-sdk/package.json
 COPY integration-worker/package.json integration-worker/package.json
 RUN npm pkg delete --workspace @goodjob/integration-connector-sdk scripts.prepare \
     && npm ci --omit=dev --ignore-scripts --no-audit --no-fund \
-    && npm cache clean --force
+    && npm cache clean --force \
+    && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx \
+       /usr/local/lib/node_modules/corepack /usr/local/bin/corepack
 
 COPY backend/dist backend/dist
 COPY backend/resources backend/resources
@@ -47,7 +49,7 @@ COPY agent-skills agent-skills
 COPY deploy/fontconfig deploy/fontconfig
 COPY deploy/docker-compose/backend-entrypoint.sh /usr/local/bin/goodjob-backend-entrypoint
 RUN chmod 0755 /usr/local/bin/goodjob-backend-entrypoint \
-    && install -d -o node -g node -m 0700 /app/uploads \
+    && install -d -o node -g node -m 0700 /app/uploads /app/backend/.data/private \
     && chown -R node:node /app /home/node
 
 USER node

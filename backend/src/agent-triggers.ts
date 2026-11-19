@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { z } from "zod";
+import { z } from "zod/v3";
 import type { AgentActor, AgentPlanContext } from "./ai-agent.js";
 import type { CrmStore } from "./store.js";
 import type { AgentTriggerEventRecord, AgentTriggerEventType, AgentTriggerRuleRecord } from "./types.js";

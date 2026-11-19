@@ -5,7 +5,7 @@ import {
   randomUUID,
   timingSafeEqual
 } from "node:crypto";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { AI_SEARCH_ADAPTER_VERSION } from "./ai-search-provider.js";
 import { getProvider } from "./lead-providers.js";
 import { PROVIDER_CONTRACT_VERSION } from "./provider-contract.js";

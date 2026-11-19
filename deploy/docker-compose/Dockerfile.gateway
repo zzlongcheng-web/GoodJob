@@ -1,4 +1,8 @@
-FROM nginx:1.26-alpine
+FROM nginx:1.30.6-alpine3.24
+
+# Vendor-patched libxslt; fail the build if this Alpine repo has not
+# published the release that resolves the reported High CVEs.
+RUN apk add --no-cache 'libxslt>=1.1.43-r4'
 
 COPY frontend/dist /usr/share/nginx/html
 COPY whatsapp-plugin/dist /usr/share/nginx/html/whatsapp-plugin

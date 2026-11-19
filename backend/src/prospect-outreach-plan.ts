@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { evaluateProspectEmailOutreachEligibility } from "./prospect-outreach-eligibility.js";
 import {
   composeItem,

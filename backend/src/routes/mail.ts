@@ -7,7 +7,7 @@
 import type { Express } from "express";
 import { type Request } from "express";
 import { randomUUID } from "node:crypto";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { canSeeOwner, requireAuth } from "../auth.js";
 import { aggregateReplyStats } from "../development-email-reply-stats.js";
 import { callAiModel, extractJsonObject } from "../ai-model-runtime.js";

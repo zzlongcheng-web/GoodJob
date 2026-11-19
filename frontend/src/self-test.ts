@@ -22,6 +22,16 @@ const apiLayer = [
   "./prototype-api.ts",
   ...readdirSync(new URL("./modules/", import.meta.url)).filter((name) => name.endsWith(".ts")).sort().map((name) => `./modules/${name}`)
 ].map((file) => readFileSync(new URL(file, import.meta.url), "utf8")).join("\n");
+
+// Regression guard: never prefill hard-coded demo credentials on the public login page.
+const loginEventSource = readFileSync(new URL("./modules/events.ts", import.meta.url), "utf8");
+const loginEntrySource = readFileSync(new URL("./prototype-api.ts", import.meta.url), "utf8");
+assert.doesNotMatch(
+  loginEventSource + loginEntrySource,
+  /prefillLoginCredentials|DEFAULT_LOGIN_(?:EMAIL|PASSWORD)|admin@goodjob\.com|goodjob123/u,
+  "生产登录入口不得写死或自动填充演示管理员凭据"
+);
+assert.match(loginEntrySource, /loginWithPassword\(email, password\)/u, "密码登录入口必须保留");
 const prospectRadar = readFileSync(new URL("./prospect-radar.ts", import.meta.url), "utf8");
 const integrationCenter = readFileSync(new URL("./integrations/integration-center.ts", import.meta.url), "utf8");
 const productConfig = JSON.parse(readFileSync(new URL("../public/product-config.json", import.meta.url), "utf8")) as {

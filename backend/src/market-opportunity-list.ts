@@ -4,7 +4,7 @@ import {
   randomBytes,
   timingSafeEqual
 } from "node:crypto";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { currentMarketOpportunityDatasetFingerprint } from "./market-opportunity-facts.js";
 import type { CrmStore } from "./store.js";
 import type {

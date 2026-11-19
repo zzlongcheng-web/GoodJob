@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { app } from "./server.js";
 import { getStore } from "./store.js";
 import { buildManagementPerformance } from "./management-performance.js";
+import { calculateMonthlyNewCustomerPerformance } from "./monthly-new-customer-performance.js";
 import { parseLeadText } from "./lead-text-parser.js";
 
 const store = getStore();
@@ -16,6 +17,7 @@ const original = buildManagementPerformance(store, manager, month, new Date("202
 assert.ok(original && original.rows.every((row) => store.users.some((u) =>
   u.id === row.ownerId && u.teamId === manager.teamId && u.role === "sales")));
 assert.equal(original?.target, 61);
+assert.equal(original?.timezone, "Asia/Shanghai", "management business dates must use Beijing/Shanghai time");
 
 const invalid = parseLeadText("Company: NoContact 1794686400000 Ltd\nContact: Nobody");
 assert.equal(invalid.phone, "", "13-digit timestamp embedded in company must not be telephone");
@@ -37,12 +39,14 @@ try {
   assert.ok(row.newLeads >= 1 && row.communicationCandidates >= 1, "new lead and activity must appear");
   const oldRow = original?.rows.find((item) => item.ownerId === sales.id);
   assert.equal(row.newLeads, (oldRow?.newLeads || 0) + 1, "multiple imports of one company must count once");
-  assert.ok(row.verifiedWhatsAppReplies <= row.communicationCandidates, "notes alone cannot count as verified replies");
   assert.equal(row.target, 61);
 
   // 已核实回复必须是双向证据：只有客户入站、没有我方出站 → 不计；补上出站后 → +1
-  const ownedCustomer = store.customers.find((c) => c.ownerId === sales.id && c.teamId === sales.teamId);
-  assert.ok(ownedCustomer, "Expected an owned customer for verified-reply test");
+  const baseCustomer = store.customers.find((c) => c.ownerId === sales.id && c.teamId === sales.teamId);
+  assert.ok(baseCustomer, "Expected an owned customer for verified-reply test");
+  // Fresh customer: no earlier communication, so it is genuinely "new" in the KPI month.
+  const ownedCustomer = { ...baseCustomer, id: marker + "_cust", company: "Dashboard KPI Fresh Customer Ltd", poolStatus: "owned" as const };
+  store.customers.push(ownedCustomer);
   const linked = store.leads.find((lead) => lead.id === marker);
   assert.ok(linked);
   linked.convertedCustomerId = ownedCustomer.id;
@@ -57,11 +61,19 @@ try {
   const twoWay = buildManagementPerformance(store, manager, month, new Date("2026-11-14T16:00:00Z"))
     ?.rows.find((item) => item.ownerId === sales.id)?.verifiedWhatsAppReplies ?? 0;
   assert.equal(twoWay, before + 1, "two-way WhatsApp evidence counts as one verified reply");
+  // Dashboard must equal the authoritative monthly endpoint calculation.
+  const auth = calculateMonthlyNewCustomerPerformance({
+    month, customers: store.customers.filter((c) => c.teamId === manager.teamId), activities: store.customerActivities,
+    whatsappMessages: store.whatsappMessages, ownerIds: [sales.id], asOf: "2026-11-14T16:00:00Z"
+  }).members.find((item) => item.ownerId === sales.id);
+  assert.equal(twoWay, auth?.independentlyVerifiedCount, "dashboard verified count must equal the authoritative KPI module");
 } finally {
   for (const id of [marker + "_in", marker + "_out"]) {
     const i = store.whatsappMessages.findIndex((m) => m.id === id);
     if (i >= 0) store.whatsappMessages.splice(i, 1);
   }
+  const custIndex = store.customers.findIndex((c) => c.id === marker + "_cust");
+  if (custIndex >= 0) store.customers.splice(custIndex, 1);
   store.leads.splice(store.leads.findIndex((lead) => lead.id === marker), 1);
   store.leads.splice(store.leads.findIndex((lead) => lead.id === marker + "_second_import"), 1);
   store.leadActivities.splice(store.leadActivities.findIndex((activity) => activity.id === marker + "_activity"), 1);

@@ -7,7 +7,7 @@
 import type { Express } from "express";
 import express from "express";
 import rateLimit from "express-rate-limit";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { requireAuth } from "../auth.js";
 import { type SessionUser } from "../types.js";
 import { getExchangeRepository } from "../exchange/exchange-repository.js";

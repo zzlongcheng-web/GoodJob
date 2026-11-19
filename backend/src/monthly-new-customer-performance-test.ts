@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { calculateMonthlyNewCustomerPerformance } from "./monthly-new-customer-performance.js";
+import { calculateMonthlyNewCustomerPerformance, currentPerformanceMonth } from "./monthly-new-customer-performance.js";
 
 const asOf = "2026-12-01T00:00:00.000Z";
 const month = "2026-11";
@@ -38,6 +38,7 @@ const report = (options: {
 });
 
 const all61 = report();
+assert.equal(all61.timezone, "Asia/Shanghai");
 assert.equal(all61.members.length, 1);
 assert.equal(all61.members[0].qualifiedCount, 61);
 assert.equal(all61.members[0].independentlyVerifiedCount, 61);
@@ -69,8 +70,8 @@ assert.equal(oneWay.members[0].status, "below_target");
 const historical = report({
   subset: [customers[61]],
   messages: [
-    { customerId: "customer-62", direction: "outbound", createdAt: "2026-10-31T22:00:00Z" },
-    { customerId: "customer-62", direction: "inbound", createdAt: "2026-10-31T23:00:00Z" },
+    { customerId: "customer-62", direction: "outbound", createdAt: "2026-10-31T12:00:00Z" },
+    { customerId: "customer-62", direction: "inbound", createdAt: "2026-10-31T13:00:00Z" },
     { customerId: "customer-62", direction: "inbound", createdAt: "2026-11-02T10:00:00Z" }
   ]
 });
@@ -80,12 +81,36 @@ assert.equal(historical.members[0].qualifiedCount, 0);
 const acrossBoundary = report({
   subset: [customers[61]],
   messages: [
-    { customerId: "customer-62", direction: "outbound", createdAt: "2026-10-31T23:59:00Z" },
-    { customerId: "customer-62", direction: "inbound", createdAt: "2026-11-01T00:01:00Z" }
+    { customerId: "customer-62", direction: "outbound", createdAt: "2026-10-31T15:59:00Z" },
+    { customerId: "customer-62", direction: "inbound", createdAt: "2026-10-31T16:01:00Z" }
   ]
 });
 assert.equal(acrossBoundary.members[0].qualifiedCount, 1);
-assert.equal(acrossBoundary.members[0].customers[0].firstEffectiveAt, "2026-11-01T00:01:00.000Z");
+assert.equal(acrossBoundary.members[0].customers[0].firstEffectiveAt, "2026-10-31T16:01:00.000Z");
+
+// Asia/Shanghai midnight is 16:00 UTC on the previous date. The first
+// qualifying two-way exchange must be attributed to the Beijing month.
+const boundary = report({
+  subset: [customers[61], customers[62], customers[63]],
+  messages: [
+    { customerId: "customer-62", direction: "outbound", createdAt: "2026-10-31T15:50:00Z" },
+    { customerId: "customer-62", direction: "inbound", createdAt: "2026-10-31T15:59:00Z" },
+    { customerId: "customer-63", direction: "outbound", createdAt: "2026-10-31T15:59:00Z" },
+    { customerId: "customer-63", direction: "inbound", createdAt: "2026-10-31T16:00:00Z" },
+    { customerId: "customer-64", direction: "outbound", createdAt: "2026-11-30T15:59:00Z" },
+    { customerId: "customer-64", direction: "inbound", createdAt: "2026-11-30T16:00:00Z" }
+  ]
+});
+assert.equal(boundary.members[0].qualifiedCount, 1);
+assert.deepEqual(boundary.members[0].customers.map((c) => c.customerId), ["customer-63"]);
+const decBoundary = calculateMonthlyNewCustomerPerformance({
+  month: "2026-12", customers: [customers[63]],
+  activities: [], whatsappMessages: [
+    { customerId: "customer-64", direction: "outbound", createdAt: "2026-11-30T15:59:00Z" },
+    { customerId: "customer-64", direction: "inbound", createdAt: "2026-11-30T16:00:00Z" }
+  ], asOf
+});
+assert.equal(decBoundary.members[0].qualifiedCount, 1);
 
 // Call/meeting records need substantive details, remain pending a manager's audit.
 const call: Activity = {
@@ -135,7 +160,13 @@ assert.equal(future.members[0].qualifiedCount, 0);
 assert.throws(() => report({ reportMonth: "2026-13" }), /month must be/);
 assert.throws(() => report({ target: 0 }), /positive integer/);
 
+// Default KPI month follows Beijing time, not UTC.
+assert.equal(currentPerformanceMonth(new Date("2026-11-30T15:59:59Z")), "2026-11");
+assert.equal(currentPerformanceMonth(new Date("2026-11-30T16:00:00Z")), "2026-12");
+assert.equal(currentPerformanceMonth(new Date("2026-12-31T16:00:00Z")), "2027-01");
+
 console.log(JSON.stringify({
   ok: true, target61AndDedup: true, crossMonthFirstReply: true, historicalNotNew: true,
-  noNotesOrUnanswered: true, manualReviewRequired: true, noScopeLeak: true, futureRejected: true
+  noNotesOrUnanswered: true, manualReviewRequired: true, noScopeLeak: true, futureRejected: true,
+  beijingMonthBoundaries: true
 }));

@@ -7,7 +7,7 @@
 import type { Express } from "express";
 import { type Response } from "express";
 import QRCode from "qrcode";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { AUTH_COOKIE_NAME, createCsrfToken, CSRF_COOKIE_NAME, csrfCookieOptions, hashPassword, PLUGIN_TOKEN_TTL_SECONDS, publicUser, requireAuth, sessionCookieOptions, signMfaSetupToken, signToken, userExpired, verifyMfaSetupToken, verifyPassword } from "../auth.js";
 import { type SessionUser } from "../types.js";
 import { getStore } from "../store.js";

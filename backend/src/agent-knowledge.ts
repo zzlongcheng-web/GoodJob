@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { z } from "zod";
+import { z } from "zod/v3";
 import type { AgentActor, AgentPlanContext } from "./ai-agent.js";
 import { compileAgentGoalSpec, goalSpecSearchText } from "./agent-goal.js";
 import { canSeeOwner, hasIamPermission } from "./auth.js";

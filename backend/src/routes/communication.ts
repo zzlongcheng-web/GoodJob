@@ -9,7 +9,7 @@ import express from "express";
 import rateLimit from "express-rate-limit";
 import { createHash, randomUUID } from "node:crypto";
 import QRCode from "qrcode";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { canSeeOwner, hasIamPermission, publicUser, requireAuth, signToken } from "../auth.js";
 import { callAiModel } from "../ai-model-runtime.js";
 import { followupSyncPayloadSchema, runWhatsappFollowupSync } from "../whatsapp-followup-sync.js";

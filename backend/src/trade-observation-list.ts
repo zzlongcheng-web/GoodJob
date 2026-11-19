@@ -4,7 +4,7 @@ import {
   randomBytes,
   timingSafeEqual
 } from "node:crypto";
-import { z } from "zod";
+import { z } from "zod/v3";
 import type { CrmStore } from "./store.js";
 import type { MarketTradeObservation, SessionUser } from "./types.js";
 

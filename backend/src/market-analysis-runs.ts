@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "zod/v3";
 import { decryptAgentJobPayload } from "./agent-job-security.js";
 import {
   attachAgentJobIdempotencyAlias,

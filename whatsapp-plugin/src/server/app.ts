@@ -5,7 +5,7 @@ import cors from "cors";
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
 import helmet from "helmet";
 import pino from "pino";
-import { z, ZodError } from "zod";
+import { z, ZodError } from "zod/v3";
 import { E164_PHONE_PATTERN, isE164PhoneNumber, type ChatMessage, type CommercialReadinessCheck, type ContactOrigin, type CrmSandboxContact, type TrainingLibraryKind } from "../shared/types.js";
 import type { AppConfig } from "./config.js";
 import { createDatabase, type Database } from "./db/database.js";

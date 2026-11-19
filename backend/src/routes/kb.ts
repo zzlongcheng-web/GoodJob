@@ -7,7 +7,7 @@
 import type { Express } from "express";
 import express, { type Response } from "express";
 import path from "node:path";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { requireAuth, signToken } from "../auth.js";
 import { type AiModelConfig, type SessionUser } from "../types.js";
 import { getKbTrainingRepository, type KbTrainingCandidate } from "../kb-training/kb-training-repository.js";

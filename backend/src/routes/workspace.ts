@@ -6,7 +6,7 @@
  */
 import type { Express } from "express";
 import { randomUUID } from "node:crypto";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { canSeeOwner, canSeePersonalData, hasIamPermission, publicUser, requireAuth } from "../auth.js";
 import { type PeerRelation, type PlanTask, type PlanTemplate, type Reminder, type SessionUser } from "../types.js";
 import { getStore } from "../store.js";

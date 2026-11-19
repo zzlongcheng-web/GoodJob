@@ -37,7 +37,7 @@ import {
   superWebProviders, superWebSearchMode, syncLeadFinderStartState, syncSelectedProspects, toggleSuperAiDiscovery,
   toggleSuperMapSearch, toggleSuperWebSearch, updateProspectBatch, websiteContactDisplay, websiteDomain
 } from "./modules/prospecting";
-import { installIntegrationCenterInteractions, integrationCenterController, prefillLoginCredentials, workspaceTabKey } from "./modules/events";
+import { installIntegrationCenterInteractions, integrationCenterController, workspaceTabKey } from "./modules/events";
 import {
   type DatabaseMaintenanceEvent, type DatabaseMaintenanceJob, type MysqlImportSelection, databaseJobStatusLabel,
   databaseJobTypeLabel, deleteBankQuestion, exportQuestionBank, formatFileSize, importQuestionBank,
@@ -2801,8 +2801,6 @@ function installEvents() {
     const password = qs<HTMLInputElement>("#loginPassword")?.value || "";
     void loginWithPassword(email, password).catch((error) => toast(error instanceof Error ? error.message : "登录失败", "error"));
   }, true);
-  // 默认账号静默内嵌：登录页输入框自动填好默认管理员账号密码，页面上不展示明文提示块。
-  // 实际填充见 prefillLoginCredentials()（启动与退出登录时触发）。
   qs<HTMLButtonElement>("#logoutButton")?.addEventListener("click", async () => {
     if (memoDirty && !await confirmAction({
       title: "退出并清除本机草稿",
@@ -2816,7 +2814,6 @@ function installEvents() {
     localStorage.removeItem(storage.user);
     state.user = null;
     document.body.classList.remove("is-authenticated");
-    prefillLoginCredentials();
     toast("已退出登录");
   });
   qs<HTMLButtonElement>("#profileEntryButton")?.addEventListener("click", () => activateNavView("profile", () => renderProfile()));
@@ -4501,12 +4498,7 @@ void loadProductConfig();
 applyTheme(getInitialTheme());
 installEvents();
 renderTopbarForView(qs<HTMLElement>(".view.active")?.id || "dashboard");
-void restoreSession()
-  .catch(() => {})
-  .finally(() => {
-    // 未登录（需要展示登录页）时，静默内嵌默认账号密码
-    if (!document.body.classList.contains("is-authenticated")) prefillLoginCredentials();
-  });
+void restoreSession().catch(() => {});
 
 // 页面加载后初始化更新模块
 void initSystemUpdate();

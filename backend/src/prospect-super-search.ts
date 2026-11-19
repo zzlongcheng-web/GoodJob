@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { canSeeOwner, isPlatformIdentity } from "./auth.js";
 import { callAiModel, extractJsonObject } from "./ai-model-runtime.js";
 import { getProvider } from "./lead-providers.js";

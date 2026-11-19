@@ -7,7 +7,7 @@
 import type { Express } from "express";
 import { type Request } from "express";
 import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { canSeeOwner, hasIamPermission, publicUser, requireAuth } from "../auth.js";
 import {
   applyLeadAssignment,

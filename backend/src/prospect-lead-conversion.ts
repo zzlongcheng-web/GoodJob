@@ -2,7 +2,7 @@ import {
   createHmac,
   timingSafeEqual
 } from "node:crypto";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { canonicalJsonStringify } from "./canonical-json.js";
 import {
   ProspectCoverageMemoryError,

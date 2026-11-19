@@ -5,7 +5,7 @@
  * 共享逻辑与全局中间件在 ../server-core.ts。
  */
 import type { Express } from "express";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { hasIamPermission, requireAuth } from "../auth.js";
 import { approveProspectOutreachBatch, batchLetterProgress, controlProspectOutreachBatch, createProspectOutreachBatch, deleteProspectOutreachBatch, getProspectOutreachBatch, listProspectOutreachBatches, updateProspectOutreachBatchItem } from "../prospect-outreach-batch.js";
 import { controlProspectOutreachPlan, createProspectOutreachPlan, deleteProspectOutreachPlan, getProspectOutreachPlan, listProspectOutreachPlans, planCandidateMatches, planProgress } from "../prospect-outreach-plan.js";

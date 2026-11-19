@@ -10,7 +10,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { canSeeOwner, canSeePersonalData, hasIamPermission, isPlatformIdentity, requireAuth } from "../auth.js";
 import { assertAiBaseUrlAllowed } from "../ai-http-security.js";
 import { buildTrackingUpdate, getTrackingProvider, isSyncable } from "../tracking-provider.js";

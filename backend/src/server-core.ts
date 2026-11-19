@@ -14,7 +14,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import nodemailer from "nodemailer";
 import "qrcode"; // 保持模块加载顺序与拆分前一致
-import { z } from "zod";
+import { z } from "zod/v3";
 import "./advanced-document-templates.js"; // 保持模块加载顺序与拆分前一致
 import "./excel-preview.js"; // 保持模块加载顺序与拆分前一致
 import "./trade-document-import.js"; // 保持模块加载顺序与拆分前一致

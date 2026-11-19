@@ -6,7 +6,7 @@
  */
 import type { Express } from "express";
 import { type Response } from "express";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { once } from "node:events";
 import { canSeeOwner, requireAuth } from "../auth.js";
 import { cancelAgentJob, isProspectRunBridgeJob, publicAgentJob, retryAgentJob } from "../agent-jobs.js";

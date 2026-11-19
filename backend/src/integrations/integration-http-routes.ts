@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Router, type Request, type Response } from "express";
 import rateLimit from "express-rate-limit";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { hasIamPermission, isPlatformIdentity, requireAuth } from "../auth.js";
 import { getStore } from "../store.js";
 import { getIntegrationControlPlaneService } from "./integration-runtime.js";

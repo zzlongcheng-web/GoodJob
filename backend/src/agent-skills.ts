@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { goalSpecSearchText, type AgentGoalSpec } from "./agent-goal.js";
 
 const skillManifestSchema = z.object({

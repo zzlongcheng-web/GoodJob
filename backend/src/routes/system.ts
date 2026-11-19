@@ -6,7 +6,7 @@
  */
 import type { Express } from "express";
 import { type Request } from "express";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { canManageAccounts, hasIamPermission, isPlatformIdentity, requireAuth } from "../auth.js";
 import { type TradeDocumentOcrProvider, type TradeDocumentOcrProviderConfig } from "../trade-document-ocr.js";
 import { type CompanyProfile, type SessionUser, type TeamSystemSettings } from "../types.js";

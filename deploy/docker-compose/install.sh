@@ -81,6 +81,12 @@ compose --profile tools run --rm backend-migrate
 assert_mysql_binlog_disabled
 compose --profile tools run --rm communication-migrate
 
+# Bootstrap encrypted HMAC ingress settings inside a persistent Docker volume.
+# The initial platform admin is not a business lead owner: signed web leads
+# remain refused until an authorized business user is explicitly configured.
+log "初始化持久化官网询盘签名密钥（默认不对接外部网站）"
+compose --profile tools run --rm backend-migrate node backend/dist/bootstrap-website-lead-ingress.js
+
 # 安全修复：默认不再创建 50 个 beta-admin 测试管理员账号；仅在明确需要时设置 GOODJOB_PROVISION_BETA_ADMINS=true
 if [[ "${GOODJOB_PROVISION_BETA_ADMINS:-false}" == "true" ]]; then
   log "预置 50 个团队管理员（凭据只保存在 $SECRETS_DIR/admin_credentials.tsv）"
@@ -144,8 +150,12 @@ install -d -m 0700 "$APP_ROOT/ops" "$runtime_dir"
 cp -a "$PACKAGE_ROOT/deploy/docker-compose/." "$runtime_dir/"
 chmod +x "$runtime_dir"/*.sh
 ln -sfn "$runtime_dir" "$APP_ROOT/ops/runtime"
-install -m 0700 "$PACKAGE_ROOT/deploy/docker-compose/baota-update.sh" \
-  "$APP_ROOT/ops/baota-update.sh"
+if [[ -f "$PACKAGE_ROOT/deploy/docker-compose/baota-update.sh" ]]; then
+  install -m 0700 "$PACKAGE_ROOT/deploy/docker-compose/baota-update.sh" \
+    "$APP_ROOT/ops/baota-update.sh"
+else
+  warn "当前源码未提供 baota-update.sh，跳过宝塔定时更新入口；试用期间请使用固定源码版本手动更新，禁止调用旧版自动更新脚本"
+fi
 
 log "清理旧应用镜像，仅保留当前版和上一版"
 for service in backend communication gateway; do
