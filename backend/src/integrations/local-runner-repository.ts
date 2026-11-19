@@ -178,7 +178,7 @@ export class MysqlLocalRunnerRepository implements LocalRunnerRepository {
     return transaction(this.pool, async (connection) => {
       const [rows] = await connection.query<PairingRow[]>(
         `SELECT * FROM integration_local_runner_pairings
-         WHERE code_hash=? AND consumed_at IS NULL AND expires_at>NOW(3) LIMIT 1 FOR UPDATE`,
+         WHERE code_hash=? AND consumed_at IS NULL AND expires_at>UTC_TIMESTAMP(3) LIMIT 1 FOR UPDATE`,
         [input.codeHash]
       );
       const pairing = rows[0];
@@ -189,7 +189,7 @@ export class MysqlLocalRunnerRepository implements LocalRunnerRepository {
          (id,team_id,owner_id,display_name,runner_status,token_hash,token_fingerprint,hostname,
           platform_name,runner_version,codex_version,workbuddy_version,capabilities_json,workspaces_json,last_seen_at,
           last_error,created_at,updated_at,revoked_at)
-         VALUES (?,?,?,?,'active',?,?,?,?,?,?,?,?,?,NOW(3),'',?,?,NULL)`,
+         VALUES (?,?,?,?,'active',?,?,?,?,?,?,?,?,?,UTC_TIMESTAMP(3),'',?,?,NULL)`,
         [runner.id, pairing.team_id, pairing.owner_id, runner.displayName, runner.tokenHash,
           runner.tokenFingerprint, runner.hostname, runner.platform, runner.runnerVersion,
           runner.codexVersion, runner.workbuddyVersion,
@@ -197,7 +197,7 @@ export class MysqlLocalRunnerRepository implements LocalRunnerRepository {
           mysqlDate(runner.createdAt), mysqlDate(runner.updatedAt)]
       );
       await connection.execute(
-        `UPDATE integration_local_runner_pairings SET consumed_at=NOW(3),runner_id=? WHERE id=?`,
+        `UPDATE integration_local_runner_pairings SET consumed_at=UTC_TIMESTAMP(3),runner_id=? WHERE id=?`,
         [runner.id, pairing.id]
       );
       return mapPairing({ ...pairing, consumed_at: new Date(), runner_id: runner.id });
@@ -223,7 +223,7 @@ export class MysqlLocalRunnerRepository implements LocalRunnerRepository {
        runner_version=COALESCE(?,runner_version),codex_version=COALESCE(?,codex_version),
        workbuddy_version=COALESCE(?,workbuddy_version),
        capabilities_json=COALESCE(?,capabilities_json),workspaces_json=COALESCE(?,workspaces_json),
-       last_error=COALESCE(?,last_error),last_seen_at=NOW(3),updated_at=NOW(3)
+       last_error=COALESCE(?,last_error),last_seen_at=UTC_TIMESTAMP(3),updated_at=UTC_TIMESTAMP(3)
        WHERE id=? AND runner_status='active'`,
       [input.hostname ?? null, input.platform ?? null, input.runnerVersion ?? null,
         input.codexVersion ?? null, input.workbuddyVersion ?? null,
@@ -235,12 +235,12 @@ export class MysqlLocalRunnerRepository implements LocalRunnerRepository {
 
   async revokeRunner(id: string) {
     const [result] = await this.pool.execute<ResultSetHeader>(
-      `UPDATE integration_local_runners SET runner_status='revoked',revoked_at=NOW(3),updated_at=NOW(3)
+      `UPDATE integration_local_runners SET runner_status='revoked',revoked_at=UTC_TIMESTAMP(3),updated_at=UTC_TIMESTAMP(3)
        WHERE id=? AND runner_status='active'`, [id]
     );
     if (result.affectedRows) {
       await this.pool.execute(
-        `UPDATE integration_local_runner_tasks SET task_status='cancelled',finished_at=NOW(3),updated_at=NOW(3),
+        `UPDATE integration_local_runner_tasks SET task_status='cancelled',finished_at=UTC_TIMESTAMP(3),updated_at=UTC_TIMESTAMP(3),
          error_message='Runner 已解除配对' WHERE runner_id=? AND task_status IN ('queued','running','cancelling')`, [id]
       );
     }
@@ -315,9 +315,9 @@ export class MysqlLocalRunnerRepository implements LocalRunnerRepository {
        SET task_status=IF(attempt_count<2,'queued','failed'),
            error_message=IF(attempt_count<2,'','Runner 心跳超时，任务未能完成'),
            lease_hash='',lease_expires_at=NULL,
-           queued_at=IF(attempt_count<2,NOW(3),queued_at),
-           finished_at=IF(attempt_count<2,NULL,NOW(3)),updated_at=NOW(3)
-       WHERE task_status IN ('running','cancelling') AND lease_expires_at<NOW(3)${runnerId ? " AND runner_id=?" : ""}`,
+           queued_at=IF(attempt_count<2,UTC_TIMESTAMP(3),queued_at),
+           finished_at=IF(attempt_count<2,NULL,UTC_TIMESTAMP(3)),updated_at=UTC_TIMESTAMP(3)
+       WHERE task_status IN ('running','cancelling') AND lease_expires_at<UTC_TIMESTAMP(3)${runnerId ? " AND runner_id=?" : ""}`,
       runnerId ? [runnerId] : []
     );
   }
@@ -340,7 +340,7 @@ export class MysqlLocalRunnerRepository implements LocalRunnerRepository {
       if (!rows[0]) return null;
       const [result] = await connection.execute<ResultSetHeader>(
         `UPDATE integration_local_runner_tasks SET task_status='running',attempt_count=attempt_count+1,
-         lease_hash=?,lease_expires_at=?,started_at=COALESCE(started_at,NOW(3)),updated_at=NOW(3)
+         lease_hash=?,lease_expires_at=?,started_at=COALESCE(started_at,UTC_TIMESTAMP(3)),updated_at=UTC_TIMESTAMP(3)
          WHERE id=? AND task_status='queued'`,
         [leaseHash, mysqlDate(leaseExpiresAt), rows[0].id]
       );
@@ -352,7 +352,7 @@ export class MysqlLocalRunnerRepository implements LocalRunnerRepository {
 
   async heartbeatTask(taskId: string, runnerId: string, leaseHash: string, leaseExpiresAt: string) {
     const [result] = await this.pool.execute<ResultSetHeader>(
-      `UPDATE integration_local_runner_tasks SET lease_expires_at=?,updated_at=NOW(3)
+      `UPDATE integration_local_runner_tasks SET lease_expires_at=?,updated_at=UTC_TIMESTAMP(3)
        WHERE id=? AND runner_id=? AND lease_hash=? AND task_status IN ('running','cancelling')`,
       [mysqlDate(leaseExpiresAt), taskId, runnerId, leaseHash]
     );
@@ -366,7 +366,7 @@ export class MysqlLocalRunnerRepository implements LocalRunnerRepository {
   async completeTask(input: CompleteLocalRunnerTaskInput) {
     const [result] = await this.pool.execute<ResultSetHeader>(
       `UPDATE integration_local_runner_tasks SET task_status=?,result_text=?,error_message=?,output_truncated=?,
-       codex_thread_id=?,lease_hash='',lease_expires_at=NULL,finished_at=NOW(3),updated_at=NOW(3)
+       codex_thread_id=?,lease_hash='',lease_expires_at=NULL,finished_at=UTC_TIMESTAMP(3),updated_at=UTC_TIMESTAMP(3)
        WHERE id=? AND runner_id=? AND lease_hash=? AND task_status IN ('running','cancelling')`,
       [input.status, input.resultText, input.errorMessage, input.outputTruncated ? 1 : 0,
         input.codexThreadId, input.taskId, input.runnerId, input.leaseHash]
@@ -377,8 +377,8 @@ export class MysqlLocalRunnerRepository implements LocalRunnerRepository {
   async cancelTask(id: string) {
     await this.pool.execute(
       `UPDATE integration_local_runner_tasks
-       SET finished_at=IF(task_status='queued',NOW(3),finished_at),
-           task_status=IF(task_status='queued','cancelled','cancelling'),cancel_requested_at=NOW(3),updated_at=NOW(3)
+       SET finished_at=IF(task_status='queued',UTC_TIMESTAMP(3),finished_at),
+           task_status=IF(task_status='queued','cancelled','cancelling'),cancel_requested_at=UTC_TIMESTAMP(3),updated_at=UTC_TIMESTAMP(3)
        WHERE id=? AND task_status IN ('queued','running')`, [id]
     );
     return this.getTask(id);
