@@ -1,12 +1,41 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import mysql from "mysql2/promise";
+import type { Connection } from "mysql2/promise";
 import type { SessionUser } from "../types.js";
 import { ensureIntegrationSchema } from "./integration-mysql-schema.js";
 import { MysqlLocalRunnerRepository } from "./local-runner-repository.js";
 import { LocalRunnerService } from "./local-runner-service.js";
 
-const databaseUrl = process.env.DATABASE_URL || process.env.MYSQL_URL;
-if (!databaseUrl) throw new Error("local runner MySQL test requires DATABASE_URL");
+function connectionOptions(databaseUrl: URL) {
+  return {
+    host: databaseUrl.hostname,
+    port: Number(databaseUrl.port || 3306),
+    user: decodeURIComponent(databaseUrl.username),
+    password: decodeURIComponent(databaseUrl.password)
+  };
+}
+
+let databaseUrl = process.env.DATABASE_URL || process.env.MYSQL_URL || "";
+let admin: Connection | undefined;
+let temporaryDatabase = "";
+
+if (!databaseUrl) {
+  const adminConnectionUrl = process.env.MYSQL_TEST_ADMIN_URL;
+  if (!adminConnectionUrl) {
+    throw new Error("local runner MySQL test requires DATABASE_URL or MYSQL_TEST_ADMIN_URL");
+  }
+  const adminUrl = new URL(adminConnectionUrl);
+  admin = await mysql.createConnection(connectionOptions(adminUrl));
+  temporaryDatabase = `goodjob_local_runner_test_${randomUUID().replaceAll("-", "").slice(0, 16)}`;
+  await admin.query(
+    `CREATE DATABASE \`${temporaryDatabase}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
+  );
+  const isolatedUrl = new URL(adminConnectionUrl);
+  isolatedUrl.pathname = `/${temporaryDatabase}`;
+  databaseUrl = isolatedUrl.toString();
+}
+
 // Reproduce the production risk: MySQL session time can be +08:00 while Node uses UTC instants.
 // A single connection keeps the session-zone assertion deterministic for this regression test.
 const pool = mysql.createPool({ uri: databaseUrl, connectionLimit: 1 });
@@ -163,9 +192,19 @@ try {
     twentyFourHourTimeoutCap: true
   }, null, 2));
 } finally {
-  await pool.execute("DELETE FROM integration_local_runner_task_events WHERE team_id IN (?,?)", [teamA, teamB]);
-  await pool.execute("DELETE FROM integration_local_runner_tasks WHERE team_id IN (?,?)", [teamA, teamB]);
-  await pool.execute("DELETE FROM integration_local_runners WHERE team_id IN (?,?)", [teamA, teamB]);
-  await pool.execute("DELETE FROM integration_local_runner_pairings WHERE team_id IN (?,?)", [teamA, teamB]);
-  await pool.end();
+  try {
+    await pool.execute("DELETE FROM integration_local_runner_task_events WHERE team_id IN (?,?)", [teamA, teamB]);
+    await pool.execute("DELETE FROM integration_local_runner_tasks WHERE team_id IN (?,?)", [teamA, teamB]);
+    await pool.execute("DELETE FROM integration_local_runners WHERE team_id IN (?,?)", [teamA, teamB]);
+    await pool.execute("DELETE FROM integration_local_runner_pairings WHERE team_id IN (?,?)", [teamA, teamB]);
+  } finally {
+    await pool.end();
+    if (admin && temporaryDatabase) {
+      try {
+        await admin.query(`DROP DATABASE IF EXISTS \`${temporaryDatabase}\``);
+      } finally {
+        await admin.end();
+      }
+    }
+  }
 }
