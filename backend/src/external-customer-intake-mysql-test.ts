@@ -52,6 +52,17 @@ try {
   const session = signToken(publicUser(owner));
   const colleagueSession = signToken(publicUser(colleague));
   const managerSession = signToken(publicUser(manager));
+  // Give the fixture explicit least-privilege IAM grants; this test verifies intake enforcement,
+  // while production IAM provisioning remains owned by the existing CRM authorization system.
+  store.validateIamSession = async () => ({valid:true});
+  store.getIamCapabilitySnapshot = async actor => ({
+    source:"tenant",
+    permissions: actor.id===manager.id
+      ? {"customer.read":["tenant"],"customer.create":["tenant"],"member.manage":["tenant"]}
+      : {"customer.read":["self"],"customer.create":["self"]},
+    roleNames: actor.id===manager.id ? ["test-admin"] : ["test-sales"]
+  });
+  store.resolveIamDataScope = async actor => ({tenantWide:false,ownerIds:[actor.id]});
   const issue = async (jwt: string) => {
     const response = await call(prefix+"/tokens","POST",jwt,{label:"isolated test"});
     assert.equal(response.code,201,"issue must succeed for authorized employee");
