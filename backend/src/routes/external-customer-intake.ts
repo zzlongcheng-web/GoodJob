@@ -6,7 +6,7 @@ import { asyncRoute, enforceIamTenantPermission } from "../server-core.js";
 import { getStore } from "../store.js";
 import type { Customer } from "../types.js";
 import { getExternalIntakeRepository, type IntakeTokenRecord } from "../external-customer-intake-repository.js";
-import { intakeDuplicateReasons, intakeGrantValid } from "../external-customer-intake-policy.js";
+import { intakeGrantValid } from "../external-customer-intake-policy.js";
 
 const base = "/api/external-customer-intake";
 const enabled = () => process.env.EXTERNAL_CUSTOMER_INTAKE_ENABLED === "true";
@@ -24,8 +24,6 @@ const intake = z.object({
   otherNotes: z.string().trim().max(2000).default("")
 }).strict();
 type Input = z.infer<typeof intake>;
-class DuplicateIntakeError extends Error {}
-class InvalidIntakeGrantError extends Error {}
 
 function usableRepository(res: Response, requireEnabled = true) {
   res.setHeader("Cache-Control", "no-store");
@@ -136,40 +134,49 @@ export function registerExternalCustomerIntakeRoutes(app: Express) {
       let result: Record<string,unknown> = {status:"unavailable",message:"客户录入暂不可用，请稍后重新查重"};
       try {
         if (action === "check") {
-          const duplicate = intakeDuplicateReasons(body,store.customers,actor.teamId).length > 0;
+          const duplicate = await repo.hasDuplicate(body,actor.teamId,store.customers);
           outcome = duplicate ? "duplicate" : "clear";
           status = 200;
           result = {status:outcome,duplicate};
         } else {
-          if (!store.persistMutation) throw new Error("缺少串行事务持久化");
-          const customer = await store.persistMutation(() => {
-            const currentUser = store.users.find(u => u.id === actor.id);
-            if (!currentUser || !intakeGrantValid(record,currentUser)) throw new InvalidIntakeGrantError();
-            if (intakeDuplicateReasons(body,store.customers,actor.teamId).length) throw new DuplicateIntakeError();
-            const value = newCustomer(body,actor.id,actor.teamId);
-            store.customers.unshift(value);
-            return { value, rollback:() => {
-              const index = store.customers.findIndex(c => c.id === value.id);
-              if (index >= 0) store.customers.splice(index,1);
-            }};
+          const customer = newCustomer(body,actor.id,actor.teamId);
+          const created = await repo.createCustomer(record,customer,store,audit,async () => {
+            const current = store.users.find(u => u.id === actor.id);
+            if (!current || !intakeGrantValid(record,current)) return false;
+            const fresh = publicUser(current);
+            if (fresh.role === "super_admin") return false;
+            const session = await store.validateIamSession?.(fresh);
+            if (session && !session.valid) return false;
+            const snapshot = await store.getIamCapabilitySnapshot?.(fresh);
+            if (snapshot) {
+              fresh.iamPermissions = snapshot.permissions;
+              fresh.iamSource = snapshot.source;
+              fresh.iamRoleNames = snapshot.roleNames;
+            }
+            if (isPlatformIdentity(fresh) || !hasIamScope(fresh,"customer.read",["self","org_unit","org_subtree","tenant"])
+                || !hasIamScope(fresh,"customer.create",["self","org_unit","org_subtree","tenant"])) return false;
+            const scope = await store.resolveIamDataScope?.(fresh,"customer.create");
+            return !scope || scope.tenantWide || scope.ownerIds.includes(fresh.id);
           });
-          status = 201;
-          outcome = "created";
-          result = {status:outcome,customerId:customer.id,company:customer.company,country:customer.country};
+          if (created === "created") {
+            status = 201; outcome = "created";
+            result = {status:outcome,customerId:customer.id,company:customer.company,country:customer.country};
+          } else if (created === "duplicate") {
+            status = 409; outcome = "duplicate";
+            result = {status:outcome,message:"可能存在重复客户，未新增或覆盖"};
+          } else {
+            status = 401;
+            result = {status:"unauthorized",message:"员工身份或授权已失效"};
+          }
         }
-      } catch (error) {
-        if (error instanceof DuplicateIntakeError) {
-          outcome = "duplicate"; status = 409; result = {status:outcome,message:"可能存在重复客户，未新增或覆盖"};
-        } else if (error instanceof InvalidIntakeGrantError) {
-          status = 401; result = {status:"unauthorized",message:"员工身份已失效"};
-        }
+      } catch {
+        // Fail closed. A retry must check duplicates again; no raw credential or SQL error is returned.
       }
       try {
-        await repo.finishUse(audit,outcome);
+        if (outcome !== "created") await repo.finishUse(audit,outcome);
       } catch {
-        // The started audit record is durable. Do not report a successful write as a failure or invite a blind retry.
-        if (outcome === "created") result.auditPending = true;
-        else { status = 503; result = {status:"unavailable",message:"审计暂不可用，请稍后重新查重"}; }
+        // The started audit record is durable; do not invite a blind retry.
+        status = 503; result = {status:"unavailable",message:"审计暂不可用，请稍后重新查重"};
       }
       res.status(status).json(result);
     }));
