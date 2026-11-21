@@ -88,6 +88,8 @@ services:
     restart: "no"
     environment: &backend_environment
       NODE_ENV: production
+      # Runtime instants are UTC; business calendars are formatted separately.
+      TZ: UTC
       CRM_STORE: mysql
       APP_DATABASE_PROFILE: production
       CRM_SEED_DEVELOPMENT_DATA: "false"
