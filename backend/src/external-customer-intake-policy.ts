@@ -63,7 +63,7 @@ export function intakeDuplicateReasons(input: IntakeFields, existing: readonly E
   const numbers = [telephoneKey(input.phone), telephoneKey(input.whatsapp)].filter(Boolean);
   for (const customer of existing) {
     if (customer.teamId !== teamId) continue;
-    if (normal(input.company) && entityDuplicateKey(input.company, input.country) === entityDuplicateKey(customer.company, customer.country)) result.add("company_country");
+    if (normal(input.company) && entityDuplicateKey(input.company, input.country) === entityDuplicateKey(customer.company || "", customer.country || "")) result.add("company_country");
     const knownCountry = normal(input.country);
     if (knownCountry && !["未知", "unknown"].includes(knownCountry) && knownCountry === normal(customer.country)
         && [normal(customer.company), normal(customer.companyFullName)].some(name => !!name && companyNames.includes(name))) result.add("full_name_country");
