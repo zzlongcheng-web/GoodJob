@@ -82,6 +82,7 @@ export function renderProfile(user = state.user) {
   void loadCompanyProfile();
   void loadSenderMailboxes();
   void loadEmailTrackingConfig();
+  renderExternalIntakeAuthorization(user);
 }
 
 // ---------------------------------------------------------------------------
@@ -514,4 +515,77 @@ export async function checkProfileEmailDomain(button?: HTMLButtonElement) {
   } finally {
     if (button) setButtonPending(button, false, "域名检测", "检测中");
   }
+}
+
+/** A credential is shown once, never stored in web storage or sent to an AI conversation. */
+function renderExternalIntakeAuthorization(user: User) {
+  const prior = document.getElementById("externalIntakeAuthorization");
+  prior?.remove();
+  if (user.role === "super_admin" || user.iamSource === "platform") return;
+  const anchor = document.getElementById("profileScopeText");
+  const parent = anchor?.closest(".profile-info-list") || anchor?.parentElement?.parentElement;
+  if (!parent) return;
+  const panel = document.createElement("section");
+  panel.id = "externalIntakeAuthorization";
+  panel.className = "profile-info-list";
+  panel.innerHTML = '<h3>WorkBuddy 客户录入授权</h3><p class="form-hint">仅允许查重及新增客户，有效期30天。请勿把授权码发送给任何AI聊天窗口。</p><button type="button" class="btn" data-intake-refresh>查看授权</button><button type="button" class="btn primary" data-intake-issue disabled>生成个人授权</button><div data-intake-status></div><div data-intake-secret></div><div data-intake-tokens></div>';
+  parent.insertAdjacentElement("afterend",panel);
+  const status = panel.querySelector<HTMLElement>("[data-intake-status]")!;
+  const list = panel.querySelector<HTMLElement>("[data-intake-tokens]")!;
+  const secret = panel.querySelector<HTMLElement>("[data-intake-secret]")!;
+  const issue = panel.querySelector<HTMLButtonElement>("[data-intake-issue]")!;
+  const refresh = panel.querySelector<HTMLButtonElement>("[data-intake-refresh]")!;
+  type Grant = {id:string;label:string;ownerId:string;expiresAt:number;revokedAt:number|null;lastUsedAt:number|null};
+  const current = () => panel.isConnected && state.user?.id === user.id;
+  async function load() {
+    refresh.disabled = true;
+    issue.disabled = true;
+    try {
+      const personal = await api<{enabled:boolean;tokens:Grant[]}>("/api/external-customer-intake/tokens");
+      const teamAllowed = Boolean((state.iamCapabilities?.permissions || user.iamPermissions || {})["member.manage"]?.includes("tenant"));
+      const grants = teamAllowed ? await api<{enabled:boolean;tokens:Grant[]}>("/api/external-customer-intake/tokens?scope=team") : personal;
+      if (!current()) return;
+      status.textContent = grants.enabled ? "客户录入服务已启用" : "客户录入服务尚未启用";
+      issue.disabled = !grants.enabled;
+      list.replaceChildren();
+      for (const grant of grants.tokens) {
+        const line = document.createElement("div");
+        const text = document.createElement("span");
+        text.textContent = grant.label + " · " + (grant.ownerId === user.id ? "本人" : grant.ownerId) + " · " + (grant.revokedAt !== null ? "已撤销" : grant.expiresAt <= Date.now() ? "已过期" : "有效至 " + new Date(grant.expiresAt).toLocaleString());
+        line.append(text);
+        if (grant.revokedAt === null) {
+          const revoke = document.createElement("button");
+          revoke.type = "button"; revoke.className = "btn"; revoke.textContent = "撤销";
+          revoke.onclick = async () => {
+            if (!await confirmAction({title:"撤销客户录入授权",message:"撤销后此设备将不能继续自动录入。",confirmLabel:"撤销"})) return;
+            revoke.disabled = true;
+            try { await api("/api/external-customer-intake/tokens/" + encodeURIComponent(grant.id),{method:"DELETE"}); if (current()) { secret.replaceChildren(); await load(); } }
+            catch { if (current()) { status.textContent = "撤销失败，请重试"; revoke.disabled = false; } }
+          };
+          line.append(revoke);
+        }
+        list.append(line);
+      }
+    } catch { if (current()) status.textContent = "录入授权暂不可用"; }
+    finally { if (current()) refresh.disabled = false; }
+  }
+  refresh.onclick = () => { secret.replaceChildren(); void load(); };
+  issue.onclick = async () => {
+    if (!await confirmAction({title:"生成个人客户录入授权",message:"仅用于本人的 WorkBuddy 查重和新增客户。授权码只显示一次。",confirmLabel:"生成授权"})) return;
+    if (!current()) return;
+    issue.disabled = true;
+    secret.replaceChildren();
+    try {
+      const value = await api<{token:string}>("/api/external-customer-intake/tokens",{method:"POST",body:JSON.stringify({label:"WorkBuddy"})});
+      if (!current()) return;
+      const input = document.createElement("input");
+      input.type = "password"; input.readOnly = true; input.value = value.token; input.autocomplete = "off";
+      const copy = document.createElement("button"); copy.type = "button"; copy.className = "btn"; copy.textContent = "复制授权码";
+      copy.onclick = async () => { try { await navigator.clipboard.writeText(input.value); copy.textContent = "已复制，请粘贴到本地授权工具"; } catch { input.type = "text"; input.select(); } };
+      const hide = document.createElement("button"); hide.type = "button"; hide.className = "btn"; hide.textContent = "清除显示";
+      hide.onclick = () => { input.value = ""; secret.replaceChildren(); };
+      secret.append(input,copy,hide);
+      await load();
+    } catch { if (current()) { status.textContent = "生成失败，请检查权限"; issue.disabled = false; } }
+  };
 }
