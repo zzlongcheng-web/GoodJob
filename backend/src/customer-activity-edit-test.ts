@@ -182,13 +182,16 @@ try {
   check("sales 批量删除不能改变客户数据", getStore().customers.some((item) => item.id === "c1"));
 
   /* ---------------- DELETE 撤销 ---------------- */
-  const created = await request("/api/customers/c1/activities", management, {
+  const created = await request("/api/customers/c1/activities", salesToken, {
     method: "POST",
     body: JSON.stringify({ type: "whatsapp", content: "[WhatsApp 自动同步 2026-10-14] 撤销探针" })
   });
   check("创建探针跟进 → 200", created.response.status === 200, created.response.status);
   const probeId = String(created.json.activity?.id);
   check("探针有 id", probeId.length > 0, probeId);
+  const ownProbeDelete = await request(`/api/customers/c1/activities/${probeId}`, salesToken, { method: "DELETE" });
+  check("sales 撤销自己创建的跟进必须 → 403", ownProbeDelete.response.status === 403, ownProbeDelete.response.status);
+  check("sales 撤销自己的跟进不得删除记录", getStore().customerActivities.some((item) => item.id === probeId));
 
   const countBeforeDelete = getStore().customerActivities.length;
   const removed = await request(`/api/customers/c1/activities/${probeId}`, management, { method: "DELETE" });
@@ -218,11 +221,6 @@ try {
     "越权撤销未误删目标记录",
     getStore().customerActivities.some((item) => item.id === "ca3")
   );
-  const ownProbeDelete = await request(`/api/customers/c1/activities/${probeId}`, salesToken, { method: "DELETE" });
-  check("sales 撤销自己客户的跟进必须 → 403", ownProbeDelete.response.status === 403, ownProbeDelete.response.status);
-  check("sales 撤销自己的跟进也不得删除记录", getStore().customerActivities.some((item) => item.id === probeId));
-
-
   /* ---------------- 输出 ---------------- */
   console.log(JSON.stringify({
     ok: failures.length === 0,
