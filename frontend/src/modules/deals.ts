@@ -1,3 +1,4 @@
+import { crmDisplayInstant, formatBeijingInstant } from "../business-time";
 /**
  * 商机管道、报关预览、商机详情与归档。
  *
@@ -1136,9 +1137,9 @@ async function submitDealLost(id: string) {
 
 export function formatDateTime(value?: string) {
   if (!value) return "未记录";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+  const date = crmDisplayInstant(value);
+  if (!date) return value;
+  return formatBeijingInstant(date, { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
 export async function refreshClosedDeals() {

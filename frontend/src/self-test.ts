@@ -1,3 +1,4 @@
+import { beijingDateKey, crmDisplayInstant, formatBeijingInstant } from "./business-time.js";
 import { readdirSync, readFileSync } from "node:fs";
 import { strict as assert } from "node:assert";
 import { resolveLeadAiSearchDraft } from "./lead-ai-search.js";
@@ -2092,3 +2093,11 @@ assert.match(
 }
 
 console.log(JSON.stringify({ ok: true, checked: required.length }, null, 2));
+
+// Verify China month boundaries without relying on the local machine timezone.
+assert.equal(beijingDateKey(new Date("2026-11-30T15:59:59Z")), "2026-11-30");
+assert.equal(beijingDateKey(new Date("2026-11-30T16:00:00Z")), "2026-12-01");
+assert.equal(formatBeijingInstant(new Date("2026-11-30T16:00:00Z"), { hour: "2-digit", minute: "2-digit" }), "00:00");
+assert.equal(crmDisplayInstant("2026-12-01T00:00:00+08:00")?.toISOString(), "2026-11-30T16:00:00.000Z");
+assert.equal(crmDisplayInstant("2026-12-01"), null);
+assert.equal(crmDisplayInstant("2026-12-01T00:00:00"), null);

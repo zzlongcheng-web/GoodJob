@@ -1,3 +1,4 @@
+import { crmDisplayInstant, formatBeijingInstant } from "../business-time";
 import {
   createIntegrationClient,
   type IntegrationRequest,
@@ -49,10 +50,10 @@ function escapeHtml(value: unknown) {
 
 function formatDate(value: string) {
   if (!value) return "-";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "-" : new Intl.DateTimeFormat("zh-CN", {
+  const date = crmDisplayInstant(value);
+  return !date ? "-" : formatBeijingInstant(date, {
     month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit"
-  }).format(date);
+  });
 }
 
 function basename(value: string) {
@@ -312,7 +313,7 @@ export function mountLocalRunnerCenter(root: HTMLElement, dependencies: Dependen
       try {
         const result = await client.createLocalRunnerPairing(document.querySelector<HTMLInputElement>("#localRunnerPairName")?.value.trim() || "我的电脑");
         dependencies.openModal("在本机完成配对", `<div class="local-runner-pair-result">
-          <span>一次性配对码</span><strong>${escapeHtml(result.pairingCode)}</strong><small>${escapeHtml(formatDate(result.expiresAt))} 前有效</small>
+          <span>一次性配对码</span><strong>${escapeHtml(result.pairingCode)}</strong><small>北京时间 ${escapeHtml(formatDate(result.expiresAt))} 前有效</small>
           <label>① 在已装 Runner 的终端执行（把 /path/to/workspace 换成本机项目绝对路径）</label><code>${escapeHtml(result.command)}</code>
           <p>② 执行成功后回到本页，设备会自动出现；30 秒内没出现就看终端报错。</p>
           <p class="warn">配对只解决「谁来执行」，不解决「能不能执行」：本机 CLI 没登录时任务仍会 401 失败，务必先跑通 <b>codebuddy /login</b>。</p>

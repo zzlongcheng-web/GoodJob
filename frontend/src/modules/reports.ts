@@ -1,3 +1,4 @@
+import { crmDisplayInstant, formatBeijingInstant } from "../business-time";
 /**
  * 经营汇报。
  *
@@ -59,9 +60,9 @@ function renderManagementPerformance(report: ExecutiveReport) {
 function renderExecutiveReport(report: ExecutiveReport) {
   state.executiveReport = report;
   state.reportNote = report.reportNote || "";
-  const generatedAt = new Date(report.period.asOf);
-  const generatedText = Number.isFinite(generatedAt.getTime())
-    ? generatedAt.toLocaleString("zh-CN", { hour12: false })
+  const generatedAt = crmDisplayInstant(report.period.asOf);
+  const generatedText = generatedAt
+    ? formatBeijingInstant(generatedAt, { year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" })
     : report.period.asOf;
   const setText = (selector: string, value: string) => {
     const node = qs<HTMLElement>(selector);
@@ -244,9 +245,9 @@ export function collaborationDate(value: string) {
 
 export function collaborationDateTime(value: string) {
   if (!value) return "";
-  const date = new Date(value);
-  return Number.isFinite(date.getTime())
-    ? date.toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false })
+  const date = crmDisplayInstant(value);
+  return date
+    ? formatBeijingInstant(date, { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })
     : value;
 }
 
