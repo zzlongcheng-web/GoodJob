@@ -30,6 +30,7 @@ import {
   customerWithPipeline,
   entityDuplicateKey,
   findWritableCustomer,
+  enforceIamTenantPermission,
   getAiConfig,
   ownedCustomersFor,
   uploadsDir
@@ -1074,6 +1075,11 @@ export function registerCustomersRoutes(app: Express) {
    * DELETE 在 Agent 契约里自动落到 `explicit_confirmation`，不需要手工登记。
    */
   app.delete("/api/customers/:id/activities/:activityId", requireAuth, asyncRoute(async (req, res) => {
+    // Revoking customer activity is an administrator-only destructive operation.
+    // Enforce this before looking up customer/activity IDs so sales users cannot infer record existence.
+    let allowed = false;
+    await enforceIamTenantPermission(req, res, () => { allowed = true; }, "customer.delete");
+    if (!allowed) return;
     const store = getStore();
     const customer = findWritableCustomer(req.user!, req.params.id, res);
     if (!customer) return;
