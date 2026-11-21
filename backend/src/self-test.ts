@@ -327,11 +327,13 @@ try {
     headers: { authorization: `Bearer ${salesToken}` },
     body: JSON.stringify({ ids: [boundaryCustomer.json.customer.id] })
   });
-  if (!boundaryDelete.response.ok) throw new Error("boundary customer delete failed");
-  const managerTodosAfterBoundaryDelete = await request("/api/todos", { headers: { authorization: `Bearer ${managerToken}` } });
-  const salesTodosAfterBoundaryDelete = await request("/api/todos", { headers: { authorization: `Bearer ${salesToken}` } });
-  if (!managerTodosAfterBoundaryDelete.json.todos.some((todo: { id: string }) => todo.id === managerBoundaryTodo.json.todo.id)) throw new Error("customer delete must not remove manager personal todo");
-  if (salesTodosAfterBoundaryDelete.json.todos.some((todo: { id: string }) => todo.id === salesBoundaryTodo.json.todo.id)) throw new Error("customer delete should remove current user's related todo");
+  if (boundaryDelete.response.status !== 403) throw new Error("ordinary sales member must not delete customers");
+  const customersAfterDeniedDelete = await request("/api/customers", { headers: { authorization: `Bearer ${salesToken}` } });
+  if (!customersAfterDeniedDelete.json.customers.some((customer: { id: string }) => customer.id === boundaryCustomer.json.customer.id)) throw new Error("denied customer delete must preserve the customer");
+  const managerTodosAfterDeniedDelete = await request("/api/todos", { headers: { authorization: `Bearer ${managerToken}` } });
+  const salesTodosAfterDeniedDelete = await request("/api/todos", { headers: { authorization: `Bearer ${salesToken}` } });
+  if (!managerTodosAfterDeniedDelete.json.todos.some((todo: { id: string }) => todo.id === managerBoundaryTodo.json.todo.id)) throw new Error("denied customer delete must preserve manager personal todo");
+  if (!salesTodosAfterDeniedDelete.json.todos.some((todo: { id: string }) => todo.id === salesBoundaryTodo.json.todo.id)) throw new Error("denied customer delete must preserve sales personal todo");
 
   const invalidOcrImage = await request("/api/tools/ocr/jobs/current/image", {
     method: "POST",
