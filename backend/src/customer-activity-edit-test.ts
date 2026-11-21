@@ -64,6 +64,9 @@ try {
   const manager = store.users.find((item) => item.email === "alex@goodjob.com")!;
   const management = await login("alex@goodjob.com");
   const salesToken = await login("shirley@goodjob.com");
+  const administrator = store.users.find(item => item.role === "admin" && item.teamId === manager.teamId);
+  if (!administrator) throw new Error("Missing tenant admin fixture");
+  const administratorSession = await login(administrator.email);
 
   // 种子数据：c1/c2 属 shirley(europe)，c3 属 mia(europe)；ca1→c1, ca2→c2, ca3→c3
   const originalCa1CreatedAt = "2026-07-10T03:20:00.000Z";
@@ -193,8 +196,11 @@ try {
   check("sales 撤销自己创建的跟进必须 → 403", ownProbeDelete.response.status === 403, ownProbeDelete.response.status);
   check("sales 撤销自己的跟进不得删除记录", getStore().customerActivities.some((item) => item.id === probeId));
 
+  const managerDenied = await request(`/api/customers/c1/activities/${probeId}`, management, { method: "DELETE" });
+  check("manager cannot revoke activity", managerDenied.response.status === 403, managerDenied.response.status);
+  check("manager denial preserves activity", getStore().customerActivities.some(item => item.id === probeId));
   const countBeforeDelete = getStore().customerActivities.length;
-  const removed = await request(`/api/customers/c1/activities/${probeId}`, management, { method: "DELETE" });
+  const removed = await request(`/api/customers/c1/activities/${probeId}`, administratorSession, { method: "DELETE" });
   check("撤销跟进 → 200", removed.response.status === 200, removed.response.status);
   check(
     "撤销后总数 -1",
@@ -204,11 +210,11 @@ try {
   check("撤销后该记录确实不存在", !getStore().customerActivities.some((item) => item.id === probeId));
   check("撤销返回被删 id", removed.json.removed === probeId, removed.json.removed);
 
-  const removeMissing = await request("/api/customers/c1/activities/ca_not_exist", management, { method: "DELETE" });
+  const removeMissing = await request("/api/customers/c1/activities/ca_not_exist", administratorSession, { method: "DELETE" });
   check("撤销不存在的跟进 → 404", removeMissing.response.status === 404, removeMissing.response.status);
 
   /* ---------------- DELETE 跨客户与权限 ---------------- */
-  const removeCross = await request("/api/customers/c1/activities/ca3", management, { method: "DELETE" });
+  const removeCross = await request("/api/customers/c1/activities/ca3", administratorSession, { method: "DELETE" });
   check("跨客户撤销 → 404", removeCross.response.status === 404, removeCross.response.status);
   check(
     "跨客户撤销未误删目标记录",
