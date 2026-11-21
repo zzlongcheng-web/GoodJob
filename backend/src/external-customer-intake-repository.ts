@@ -1,6 +1,9 @@
 import type { Pool, RowDataPacket, ResultSetHeader, PoolConnection } from "mysql2/promise";
-import { randomUUID } from "node:crypto";
-import { intakeTokenDigest, newIntakeToken, INTAKE_TOKEN_TTL_MS, type IntakeGrant } from "./external-customer-intake-policy.js";
+import { createHash, randomUUID } from "node:crypto";
+import { intakeTokenDigest, newIntakeToken, INTAKE_TOKEN_TTL_MS, intakeDuplicateReasons, intakeGrantValid, type IntakeFields, type IntakeGrant } from "./external-customer-intake-policy.js";
+import type { Customer } from "./types.js";
+import type { CrmStore } from "./store.js";
+type Serialized = <T>(task: () => Promise<T>) => Promise<T>;
 
 export interface IntakeTokenRecord extends IntakeGrant {
   id: string;
@@ -30,7 +33,82 @@ export async function ensureExternalIntakeSchema(pool: Pool) {
   )`);
 }
 export class MysqlExternalIntakeRepository {
-  constructor(private readonly pool: Pool) {}
+  constructor(private readonly pool: Pool, private readonly enqueue: Serialized) {}
+  private async teamRows(source: Pool | PoolConnection, teamId: string, lock = false) {
+    const [rows] = await source.execute<RowDataPacket[]>(
+      "SELECT team_id,company,country,company_full_name,email,phone,whatsapp FROM customers WHERE team_id=?" + (lock ? " FOR UPDATE" : ""), [teamId]);
+    return rows.map(row => ({
+      teamId: String(row.team_id), company: String(row.company || ""), country: String(row.country || ""),
+      companyFullName: String(row.company_full_name || ""), email: String(row.email || ""),
+      phone: String(row.phone || ""), whatsapp: String(row.whatsapp || "")
+    }));
+  }
+  async hasDuplicate(input: IntakeFields, teamId: string, cached: readonly Customer[]) {
+    const rows = await this.teamRows(this.pool,teamId);
+    return intakeDuplicateReasons(input,[...cached,...rows],teamId).length > 0;
+  }
+  /** Same queue as existing API writes. Dedicated INSERT; never call the whole-store replacement path. */
+  async createCustomer(record: IntakeTokenRecord, value: Customer, store: CrmStore, auditId: string, stillAllowed: () => Promise<boolean>): Promise<"created" | "duplicate" | "unauthorized"> {
+    return this.enqueue(async () => {
+      if (value.teamId !== record.teamId || value.ownerId !== record.ownerId || !await stillAllowed()) return "unauthorized";
+      if (intakeDuplicateReasons(value,store.customers,value.teamId).length) return "duplicate";
+      const connection = await this.pool.getConnection();
+      const lockName = "gj_intake_" + createHash("sha256").update(value.teamId).digest("hex").slice(0,48);
+      let locked = false, reserved = false, committed = false;
+      try {
+        const [lockRows] = await connection.execute<RowDataPacket[]>("SELECT GET_LOCK(?,5) AS acquired",[lockName]);
+        if (Number(lockRows[0]?.acquired) !== 1) throw new Error("客户录入串行锁暂不可用");
+        locked = true;
+        await connection.beginTransaction();
+        // A revoked/expired token cannot pass a write queued before revocation.
+        const [tokens] = await connection.execute<RowDataPacket[]>(`SELECT ${tokenFields} FROM external_customer_intake_tokens WHERE id=? FOR UPDATE`,[record.id]);
+        const user = store.users.find(u => u.id === record.ownerId);
+        const [users] = await connection.execute<RowDataPacket[]>("SELECT id,team_id,status,auth_version FROM users WHERE id=? FOR UPDATE",[record.ownerId]);
+        const dbUser = users[0];
+        if (!tokens[0] || !user || !intakeGrantValid(fromRow(tokens[0]),user) || !dbUser
+            || dbUser.status !== "active" || dbUser.team_id !== record.teamId || Number(dbUser.auth_version || 1) !== record.authVersion) {
+          await connection.rollback(); return "unauthorized";
+        }
+        const rows = await this.teamRows(connection,value.teamId,true);
+        // Check live database plus pending in-process customer writes. Reserve the exact new row before yielding to I/O.
+        if (intakeDuplicateReasons(value,[...store.customers,...rows],value.teamId).length) {
+          await connection.rollback(); return "duplicate";
+        }
+        store.customers.unshift(value);
+        reserved = true;
+        await connection.execute(
+          "INSERT INTO customers (id,company,country,contact,whatsapp,wechat,other_notes,owner_id,team_id,stage,amount,health,customer_source,customer_grade,lifecycle_status,next_reminder,wecom_bound,billing_name,company_full_name,billing_address,document_contact,phone,email,website,default_port_discharge,default_incoterm,default_payment_term,pool_status,ownership_version) VALUES (" + Array(29).fill("?").join(",") + ")",
+          [value.id,value.company,value.country,value.contact,value.whatsapp || "",value.wechat || "",value.otherNotes || "",value.ownerId,value.teamId,
+            value.stage,value.amount,value.health,value.source || "",value.grade || "C",value.lifecycleStatus || "open",value.nextReminder,value.wecomBound,
+            value.billingName,value.companyFullName || value.company,value.billingAddress,value.documentContact,value.phone || "",value.email || "",value.website || "",
+            value.defaultPortDischarge,value.defaultIncoterm,value.defaultPaymentTerm,"owned",0]);
+        await connection.execute("UPDATE external_customer_intake_audit SET outcome='created',finished_at_ms=? WHERE id=? AND outcome='started'",[Date.now(),auditId]);
+        await connection.commit();
+        committed = true;
+        return "created";
+      } catch (error) {
+        await connection.rollback().catch(() => {});
+        if (reserved && !committed) {
+          // A lost COMMIT acknowledgement is reconciled by the durable customer ID when the DB is reachable.
+          let found = false;
+          try {
+            const [rows] = await connection.execute<RowDataPacket[]>("SELECT id FROM customers WHERE id=?",[value.id]);
+            found = rows.length > 0;
+          } catch { /* fail closed, retry only after explicit duplicate check */ }
+          if (found) return "created";
+          const index = store.customers.findIndex(c => c.id === value.id);
+          if (index >= 0) store.customers.splice(index,1);
+        }
+        throw error;
+      } finally {
+        if (locked) {
+          try { await connection.execute("SELECT RELEASE_LOCK(?)",[lockName]); }
+          catch { connection.destroy(); }
+        }
+        connection.release();
+      }
+    });
+  }
   private async transaction<T>(op: (connection: PoolConnection) => Promise<T>) {
     const connection = await this.pool.getConnection();
     try {
@@ -92,5 +170,5 @@ export class MysqlExternalIntakeRepository {
   }
 }
 let repository: MysqlExternalIntakeRepository | undefined;
-export function setExternalIntakeRepository(pool: Pool) { repository = new MysqlExternalIntakeRepository(pool); }
+export function setExternalIntakeRepository(pool: Pool | null, enqueue?: Serialized) { repository = pool && enqueue ? new MysqlExternalIntakeRepository(pool,enqueue) : undefined; }
 export function getExternalIntakeRepository() { return repository; }
