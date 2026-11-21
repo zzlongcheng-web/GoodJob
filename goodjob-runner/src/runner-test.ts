@@ -219,7 +219,10 @@ assert.equal(process.env.CODEBUDDY_MCP_CONFIG?.includes("connector-proxy"), true
 // 反向守卫：剔除不能过头，CLI 启动必需的基础变量必须原样保留
 for (const key of ["HOME", "PATH", "USER", "SHELL", "TMPDIR", "WORKBUDDY_CONFIG_DIR"]) {
   if (process.env[key] !== undefined) {
-    assert.equal(isolatedEnv[key], process.env[key], `${key} 是 CLI 启动必需项，不得剔除`);
+    const envKey = process.platform === "win32"
+      ? Object.keys(isolatedEnv).find((name) => name.toUpperCase() === key.toUpperCase())
+      : key;
+    assert.equal(envKey === undefined ? undefined : isolatedEnv[envKey], process.env[key], `${key} 是 CLI 启动必需项，不得剔除`);
   }
 }
 
@@ -249,7 +252,7 @@ const workbuddyResult = await executeWorkbuddyTask({
   id: "task_workbuddy", runnerId: "runner_test", adapter: "workbuddy", prompt: "test",
   workspace: root, executionMode: "read_only", timeoutSeconds: 60, status: "running"
 }, {
-  allowedWorkspaces: [root], signal: new AbortController().signal, workbuddyBinary: fakeCodebuddy,
+  allowedWorkspaces: [root], signal: new AbortController().signal, workbuddyBinary: process.execPath, workbuddyArgumentPrefix: [fakeCodebuddy],
   async onEvent(event) { workbuddyEvents.push({ message: event.message, eventType: event.eventType, stage: event.payload?.stage }); }
 });
 assert.equal(workbuddyResult.status, "succeeded");
@@ -336,7 +339,7 @@ await executeWorkbuddyTask({
   prompt: "[[gj-cli-options {\"effort\":\"low\",\"model\":\"fast-model\",\"maxTurns\":6,\"disallowedTools\":[\"Write\",\"Edit\",\"WebFetch\",\"Grep\"]}]]\n请读取文件后输出 JSON",
   workspace: root, executionMode: "read_only", timeoutSeconds: 60, status: "running"
 }, {
-  allowedWorkspaces: [root], signal: new AbortController().signal, workbuddyBinary: fakeCodebuddy,
+  allowedWorkspaces: [root], signal: new AbortController().signal, workbuddyBinary: process.execPath, workbuddyArgumentPrefix: [fakeCodebuddy],
   async onEvent(event) { profileEvents.push(event.message); }
 });
 const profileInvocation = JSON.parse(await readFile(workbuddyInvocationFile, "utf8")) as { argv: string[]; prompt: string };
@@ -352,7 +355,7 @@ const workbuddyWriteResult = await executeWorkbuddyTask({
   id: "task_workbuddy_write", runnerId: "runner_test", adapter: "workbuddy", prompt: "test",
   workspace: root, executionMode: "workspace_write", timeoutSeconds: 60, status: "running"
 }, {
-  allowedWorkspaces: [root], signal: new AbortController().signal, workbuddyBinary: fakeCodebuddy,
+  allowedWorkspaces: [root], signal: new AbortController().signal, workbuddyBinary: process.execPath, workbuddyArgumentPrefix: [fakeCodebuddy],
   async onEvent() {}
 });
 assert.equal(workbuddyWriteResult.status, "succeeded");
@@ -366,7 +369,7 @@ const workbuddyFailedResult = await executeWorkbuddyTask({
   id: "task_workbuddy_fail", runnerId: "runner_test", adapter: "workbuddy", prompt: "test",
   workspace: root, executionMode: "read_only", timeoutSeconds: 60, status: "running"
 }, {
-  allowedWorkspaces: [root], signal: new AbortController().signal, workbuddyBinary: failingCodebuddy,
+  allowedWorkspaces: [root], signal: new AbortController().signal, workbuddyBinary: process.execPath, workbuddyArgumentPrefix: [failingCodebuddy],
   async onEvent() {}
 });
 assert.equal(workbuddyFailedResult.status, "failed");
@@ -376,14 +379,14 @@ await assert.rejects(() => executeWorkbuddyTask({
   id: "task_workbuddy_guard", runnerId: "runner_test", adapter: "codex", prompt: "test",
   workspace: root, executionMode: "read_only", timeoutSeconds: 60, status: "running"
 }, {
-  allowedWorkspaces: [root], signal: new AbortController().signal, workbuddyBinary: fakeCodebuddy,
+  allowedWorkspaces: [root], signal: new AbortController().signal, workbuddyBinary: process.execPath, workbuddyArgumentPrefix: [fakeCodebuddy],
   async onEvent() {}
 }), /只允许执行 WorkBuddy 适配器任务/);
 await assert.rejects(() => executeWorkbuddyTask({
   id: "task_workbuddy_escape", runnerId: "runner_test", adapter: "workbuddy", prompt: "test",
   workspace: tmpdir(), executionMode: "read_only", timeoutSeconds: 60, status: "running"
 }, {
-  allowedWorkspaces: [root], signal: new AbortController().signal, workbuddyBinary: fakeCodebuddy,
+  allowedWorkspaces: [root], signal: new AbortController().signal, workbuddyBinary: process.execPath, workbuddyArgumentPrefix: [fakeCodebuddy],
   async onEvent() {}
 }), /不在本机 Runner 授权范围内/);
 assert.equal(resolveWorkbuddyBinary("/custom/codebuddy"), "/custom/codebuddy");
