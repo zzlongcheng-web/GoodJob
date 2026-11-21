@@ -213,11 +213,15 @@ try {
   );
 
   const removeForbidden = await request("/api/customers/c3/activities/ca3", salesToken, { method: "DELETE" });
-  check("sales 撤销他人名下客户的跟进 → 404", removeForbidden.response.status === 404, removeForbidden.response.status);
+  check("sales 撤销他人名下客户的跟进必须 → 403", removeForbidden.response.status === 403, removeForbidden.response.status);
   check(
     "越权撤销未误删目标记录",
     getStore().customerActivities.some((item) => item.id === "ca3")
   );
+  const ownProbeDelete = await request(`/api/customers/c1/activities/${probeId}`, salesToken, { method: "DELETE" });
+  check("sales 撤销自己客户的跟进必须 → 403", ownProbeDelete.response.status === 403, ownProbeDelete.response.status);
+  check("sales 撤销自己的跟进也不得删除记录", getStore().customerActivities.some((item) => item.id === probeId));
+
 
   /* ---------------- 输出 ---------------- */
   console.log(JSON.stringify({
