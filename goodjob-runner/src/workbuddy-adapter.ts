@@ -17,6 +17,7 @@ export interface WorkBuddyExecutionOptions {
   signal: AbortSignal;
   onEvent(event: TaskEventInput): Promise<void>;
   workbuddyBinary?: string;
+  workbuddyArgumentPrefix?: string[];
 }
 
 export interface WorkBuddyExecutionResult {
@@ -334,6 +335,7 @@ export async function executeWorkbuddyTask(task: ClaimedTask, options: WorkBuddy
   const requested = parseWorkbuddyCliProfile(task.prompt);
   const profileArgs = workbuddyProfileArgs(requested.profile);
   const args = [
+    ...(options.workbuddyArgumentPrefix || []),
     "--print",
     "--output-format", "stream-json",
     "--no-session-persistence",
