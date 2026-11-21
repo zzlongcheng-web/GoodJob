@@ -13,6 +13,7 @@ export const agentApiRequestSchema = z.object({
 });
 
 const deniedPatterns: Array<{ pattern: RegExp; reason: string }> = [
+  { pattern: /^\/api\/external-customer-intake(?:\/|$)/iu, reason: "外部客户录入授权只能由人工用户管理" },
   { pattern: /^\/api\/auth(?:\/|$)/u, reason: "登录与会话接口不向 Agent 开放" },
   { pattern: /^\/api\/accounts(?:\/|$)/u, reason: "用户账号管理接口不向 Agent 开放" },
   { pattern: /^\/api\/system\/database-import(?:\/|$)/u, reason: "数据库迁移只允许人工管理员使用服务器授权码执行" },

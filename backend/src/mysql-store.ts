@@ -78,6 +78,7 @@ import { createPlatformMfaService } from "./iam/platform-mfa.js";
 import { ensureIamBusinessTenantProjection } from "./iam/iam-business-tenant-migration.js";
 import { MysqlIntegrationControlRepository } from "./integrations/integration-control-repository.js";
 import { MysqlLocalRunnerRepository } from "./integrations/local-runner-repository.js";
+import { ensureExternalIntakeSchema, setExternalIntakeRepository } from "./external-customer-intake-repository.js";
 import { LocalRunnerService } from "./integrations/local-runner-service.js";
 import { setLocalRunnerService } from "./integrations/integration-runtime.js";
 import { setIntegrationRepository } from "./integrations/integration-runtime.js";
@@ -699,6 +700,7 @@ export async function createMysqlStore(
 
   let store!: CrmStore;
   const enqueuePersistence = createSerializedTaskQueue();
+  setExternalIntakeRepository(pool, enqueuePersistence);
   const persist = () => enqueuePersistence(
     () => persistAll(pool, persistenceSnapshot(store))
   );
@@ -1356,6 +1358,7 @@ export async function createMysqlStore(
     setKnowledgeGovernanceRepository(null);
     setAiEngineJobRepository(null);
     setAppSettingsPool(null);
+    setExternalIntakeRepository(null);
     await releaseProductionInstanceLock?.();
     await pool.end();
   });
@@ -2399,6 +2402,7 @@ export async function migrateMysqlSchema(input: {
 }
 
 async function ensureSchema(pool: mysql.Pool) {
+  await ensureExternalIntakeSchema(pool);
   await pool.query(`CREATE TABLE IF NOT EXISTS users (
     id VARCHAR(64) PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
