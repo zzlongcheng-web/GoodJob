@@ -78,6 +78,7 @@ import { createPlatformMfaService } from "./iam/platform-mfa.js";
 import { ensureIamBusinessTenantProjection } from "./iam/iam-business-tenant-migration.js";
 import { MysqlIntegrationControlRepository } from "./integrations/integration-control-repository.js";
 import { MysqlLocalRunnerRepository } from "./integrations/local-runner-repository.js";
+import { ensureExternalIntakeSchema, setExternalIntakeRepository } from "./external-customer-intake-repository.js";
 import { LocalRunnerService } from "./integrations/local-runner-service.js";
 import { setLocalRunnerService } from "./integrations/integration-runtime.js";
 import { setIntegrationRepository } from "./integrations/integration-runtime.js";
@@ -696,6 +697,7 @@ export async function createMysqlStore(
   setResourceHubRepository(createMysqlResourceHubRepository(pool));
   setKnowledgeGovernanceRepository(createMysqlKnowledgeGovernanceRepository(pool));
   setLocalRunnerService(new LocalRunnerService(new MysqlLocalRunnerRepository(pool)));
+  setExternalIntakeRepository(pool);
 
   let store!: CrmStore;
   const enqueuePersistence = createSerializedTaskQueue();
@@ -2399,6 +2401,7 @@ export async function migrateMysqlSchema(input: {
 }
 
 async function ensureSchema(pool: mysql.Pool) {
+  await ensureExternalIntakeSchema(pool);
   await pool.query(`CREATE TABLE IF NOT EXISTS users (
     id VARCHAR(64) PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
