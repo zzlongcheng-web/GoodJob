@@ -38,7 +38,7 @@ if (!databaseUrl) {
 
 // Reproduce the production risk: MySQL session time can be +08:00 while Node uses UTC instants.
 // A single connection keeps the session-zone assertion deterministic for this regression test.
-const pool = mysql.createPool({ uri: databaseUrl, connectionLimit: 1 });
+const pool = mysql.createPool({ uri: databaseUrl, connectionLimit: 1, timezone: "Z" });
 await pool.query("SET time_zone = '+08:00'");
 const [timeZoneRows] = await pool.query("SELECT @@session.time_zone AS session_time_zone");
 assert.equal(
@@ -107,6 +107,10 @@ try {
   const claim = await service.claim((await service.authenticate(paired.token)));
   assert.equal(claim?.task.id, task.id);
   assert.ok(claim?.leaseToken);
+  const leaseRemainingMs = Date.parse(claim!.task.leaseExpiresAt) - Date.now();
+  assert.ok(leaseRemainingMs > 0 && leaseRemainingMs <= 30_000, "lease must round-trip as a live UTC instant");
+  await repository.recoverStaleTasks(paired.runner.id);
+  assert.equal((await repository.getTask(task.id))?.status, "running", "a fresh lease must not be recovered as expired");
   await assert.rejects(() => service.appendEvent((storedRunner!), task.id, "wrong-lease-token-value-123456789", {
     eventType: "progress", message: "must fail"
   }), /租约无效/u);

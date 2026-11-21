@@ -1,3 +1,4 @@
+import { crmDisplayInstant, formatBeijingInstant } from "../business-time";
 /**
  * 快捷联系条、客户详情页与抽屉、客户情报、客户旅程、会议记录。
  *
@@ -1260,7 +1261,8 @@ async function openWhatsappTranscriptModal(activityId: string, contactName: stri
     const transcript = await api<{ runDate: string; timezone: string; contactName: string; contactPhone: string; messages: Array<{ direction: "inbound" | "outbound"; occurredAt: string; body: string; kind: string }> }>(`/api/whatsapp/followup-transcript/${encodeURIComponent(activityId)}`);
     const bubbles = transcript.messages.map((message) => {
       const outbound = message.direction === "outbound";
-      const time = Number.isFinite(Date.parse(message.occurredAt)) ? new Date(message.occurredAt).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
+      const occurredAt = crmDisplayInstant(message.occurredAt);
+      const time = occurredAt ? formatBeijingInstant(occurredAt, { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : message.occurredAt || "";
       return `<div style="display:flex;justify-content:${outbound ? "flex-end" : "flex-start"};">
         <div style="max-width:78%;padding:8px 12px;border-radius:12px;${outbound ? "background:var(--brand);color:#fff;border-bottom-right-radius:4px;" : "background:var(--surface);border:1px solid var(--border);border-bottom-left-radius:4px;"} font-size:13px;line-height:1.55;white-space:pre-wrap;word-break:break-word;">${escapeHtml(message.body)}</div>
       </div>

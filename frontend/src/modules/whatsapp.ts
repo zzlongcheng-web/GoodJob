@@ -1,3 +1,4 @@
+import { beijingDateKey, crmDisplayInstant, formatBeijingInstant } from "../business-time";
 /**
  * WhatsApp 会话工作台。
  *
@@ -25,14 +26,13 @@ function waInitials(name: string) {
 
 function waFormatTime(iso: string, compact = false) {
   if (!iso) return "";
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  const today = new Date();
-  const sameDay = date.toDateString() === today.toDateString();
-  if (compact && sameDay) return date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
-  return date.toLocaleString("zh-CN", compact
+  const date = crmDisplayInstant(iso);
+  if (!date) return iso;
+  const sameDay = beijingDateKey(date) === beijingDateKey(new Date());
+  if (compact && sameDay) return formatBeijingInstant(date, { hour: "2-digit", minute: "2-digit" });
+  return formatBeijingInstant(date, compact
     ? { month: "2-digit", day: "2-digit" }
-    : { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
+    : { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
 // 客户号码 → WhatsApp 网页版直链。
