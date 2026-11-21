@@ -697,10 +697,10 @@ export async function createMysqlStore(
   setResourceHubRepository(createMysqlResourceHubRepository(pool));
   setKnowledgeGovernanceRepository(createMysqlKnowledgeGovernanceRepository(pool));
   setLocalRunnerService(new LocalRunnerService(new MysqlLocalRunnerRepository(pool)));
-  setExternalIntakeRepository(pool);
 
   let store!: CrmStore;
   const enqueuePersistence = createSerializedTaskQueue();
+  setExternalIntakeRepository(pool, enqueuePersistence);
   const persist = () => enqueuePersistence(
     () => persistAll(pool, persistenceSnapshot(store))
   );
@@ -1358,6 +1358,7 @@ export async function createMysqlStore(
     setKnowledgeGovernanceRepository(null);
     setAiEngineJobRepository(null);
     setAppSettingsPool(null);
+    setExternalIntakeRepository(null);
     await releaseProductionInstanceLock?.();
     await pool.end();
   });
