@@ -87,6 +87,7 @@ services:
       dockerfile: deploy/docker-compose/Dockerfile.backend
     restart: "no"
     environment: &backend_environment
+      TZ: ${GOODJOB_TZ:-Asia/Shanghai}
       NODE_ENV: production
       CRM_STORE: mysql
       APP_DATABASE_PROFILE: production
@@ -156,6 +157,7 @@ services:
       dockerfile: deploy/docker-compose/Dockerfile.communication
     restart: "no"
     environment: &communication_environment
+      TZ: ${GOODJOB_TZ:-Asia/Shanghai}
       NODE_ENV: production
       HOST: 0.0.0.0
       PORT: "3100"
@@ -250,6 +252,8 @@ services:
       - no-new-privileges:true
 
   gateway:
+    environment:
+      TZ: ${GOODJOB_TZ:-Asia/Shanghai}
     image: ${GOODJOB_GATEWAY_IMAGE:-goodjobcrm-gateway}:${GOODJOB_RELEASE_ID}
     build:
       context: ../..

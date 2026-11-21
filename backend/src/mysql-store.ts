@@ -612,7 +612,7 @@ export async function createMysqlStore(
   const databaseUrl = configuredUrl || defaultUrl;
   const profile = assertDatabaseProfile(process.env, databaseUrl);
   const processRole = options.processRole || "api";
-  const pool = mysql.createPool({ uri: databaseUrl, connectionLimit: 4, namedPlaceholders: true });
+  const pool = mysql.createPool({ uri: databaseUrl, connectionLimit: 4, namedPlaceholders: true, timezone: "Z" });
   console.log(`Golden Gain CRM database profile: ${profile.profile} (${profile.database})`);
   // 本项目要求 MySQL 关闭 binlog：生产环境发现开启直接拒绝启动，其他环境只警告
   try {
@@ -2265,7 +2265,7 @@ export async function migrateMysqlSchema(input: {
   if (!databaseUrl) throw new Error("增量迁移需要 DATABASE_URL 或 MYSQL_URL");
   assertDatabaseProfile(process.env, databaseUrl);
   const releaseId = String(input.releaseId || process.env.GOODJOB_RELEASE_ID || "manual").slice(0, 100);
-  const pool = mysql.createPool({ uri: databaseUrl, connectionLimit: 4, namedPlaceholders: true });
+  const pool = mysql.createPool({ uri: databaseUrl, connectionLimit: 4, namedPlaceholders: true, timezone: "Z" });
   // 安装/升级时最先运行的是迁移：binlog 未关闭时在这里就停下，避免后端随后起不来
   try {
     await assertBinlogDisabled(pool);

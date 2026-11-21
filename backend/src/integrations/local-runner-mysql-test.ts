@@ -36,9 +36,12 @@ if (!databaseUrl) {
   databaseUrl = isolatedUrl.toString();
 }
 
-// Reproduce the production risk: MySQL session time can be +08:00 while Node uses UTC instants.
+// Reproduce production with a Beijing-time Node runtime and a +08:00 MySQL session.
+// Keep mysql2 date serialization in UTC, independently of the process timezone.
+process.env.TZ = "Asia/Shanghai";
+assert.equal(new Date("2026-01-01T00:00:00Z").getTimezoneOffset(), -480);
 // A single connection keeps the session-zone assertion deterministic for this regression test.
-const pool = mysql.createPool({ uri: databaseUrl, connectionLimit: 1 });
+const pool = mysql.createPool({ uri: databaseUrl, connectionLimit: 1, timezone: "Z" });
 await pool.query("SET time_zone = '+08:00'");
 const [timeZoneRows] = await pool.query("SELECT @@session.time_zone AS session_time_zone");
 assert.equal(

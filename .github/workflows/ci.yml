@@ -21,6 +21,7 @@ jobs:
     timeout-minutes: 45
     env:
       CI: "true"
+      TZ: Asia/Shanghai
       NODE_ENV: test
       JWT_SECRET: goodjob-ci-jwt-secret-not-for-production-32-characters
     steps:
@@ -65,6 +66,7 @@ jobs:
           --health-retries=12
     env:
       CI: "true"
+      TZ: Asia/Shanghai
       NODE_ENV: test
       JWT_SECRET: goodjob-ci-jwt-secret-not-for-production-32-characters
       MYSQL_TEST_ADMIN_URL: mysql://root:ci_root_password_only@127.0.0.1:3306/mysql
