@@ -9,6 +9,7 @@ import { type CollaborationUser, type ExecutiveReport } from "./models";
 import { badge, escapeHtml, qs } from "./shared";
 import { api, toast } from "./ui";
 import { reportMoneyHtml, reportMoneyText } from "./customer-intake";
+import { buildRiskDealCsv } from "../report-risk-csv";
 
 function renderExecutiveReport(report: ExecutiveReport) {
   state.executiveReport = report;
@@ -120,7 +121,27 @@ export function openReportRiskModal() {
         <span>${escapeHtml(row.owner)} · ${escapeHtml(row.riskReasons.join("、"))}<br>下一动作：${escapeHtml(row.nextAction || "待补充")} · 预计成交：${escapeHtml(row.expectedCloseAt || "待补充")}</span></div>
       </div>
     `).join("")}</div>
-  `, `<button class="btn primary" data-modal-close>关闭</button>`);
+  `, `<button class="btn" type="button" id="reportRiskCsvButton">导出 CSV</button><button class="btn primary" data-modal-close>关闭</button>`);
+  qs<HTMLButtonElement>("#reportRiskCsvButton")?.addEventListener("click", exportRiskDealsCsv);
+}
+
+function exportRiskDealsCsv() {
+  const report = state.executiveReport;
+  if (!report?.riskRows.length) {
+    toast("当前范围暂无风险商机");
+    return;
+  }
+  const csv = buildRiskDealCsv(report.riskRows);
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const link = document.createElement("a");
+  const date = /^\d{4}-\d{2}-\d{2}/.exec(report.period.asOf)?.[0] || localDateValue();
+  link.href = url;
+  link.download = `GoodJob-CRM-风险商机-${date}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  toast(`已导出 ${report.riskRows.length} 条风险商机`);
 }
 
 export async function exportReport() {
