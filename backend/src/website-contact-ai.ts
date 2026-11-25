@@ -18,6 +18,7 @@ export type WebsiteContactAiExtractor = (
 
 const MAX_PAGE_TEXT_CHARS = 9_000;
 const MAX_TOTAL_TEXT_CHARS = 18_000;
+const EMAIL_PATTERN = /[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9.-]+\.[A-Z]{2,63}/giu;
 
 function compactText(value: unknown) {
   return String(value || "")
@@ -34,7 +35,7 @@ function normalizeEmail(value: unknown) {
   return compactText(value)
     .replace(/^mailto:/iu, "")
     .split("?")[0]!
-    .match(/[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9.-]+\.[A-Z]{2,63}/iu)?.[0]
+    .match(EMAIL_PATTERN)?.[0]
     ?.toLocaleLowerCase("en-US") || "";
 }
 
@@ -113,9 +114,11 @@ export function validateAiWebsiteContacts(
     if (name && !exactTextOnPage(page.text, name)) continue;
     if (title && !exactTextOnPage(page.text, title)) continue;
 
+    // Require a complete email token on the source page, not a substring of another address.
+    const sourceEmails = new Set((page.text.match(EMAIL_PATTERN) || []).map(normalizeEmail));
     const emails = [...new Set(arrayValue(item.emails)
       .map(normalizeEmail)
-      .filter((email) => email && comparisonText(page.text).includes(email)))].slice(0, 4);
+      .filter((email) => email && sourceEmails.has(email)))].slice(0, 4);
     const phones = [...new Set(arrayValue(item.phones)
       .map(normalizePhone)
       .filter((phone) => phone && exactPhoneOnPage(page.text, phone)))].slice(0, 4);
