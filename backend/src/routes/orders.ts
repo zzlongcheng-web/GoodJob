@@ -11,7 +11,7 @@ import { getFileRepository, isPreviewable } from "../file-storage.js";
 import { isHeicFile, isOfficeFile } from "../file-derive.js";
 import { type Order, type OrderFile, type OrderItem, type OrderStatus, type TradeDocument } from "../types.js";
 import { getStore } from "../store.js";
-import { checkOrderTransition, clearForwardTimestamps, deriveOrder, ensureOrderForWonDeal, nextOrderNo, nextSplitSeq, ORDER_STATUS_LABELS, orderShipments, recalcShippedQty, sumOrderItems, syncOrderFulfillment } from "../order-service.js";
+import { checkOrderTransition, clearForwardTimestamps, deriveOrder, ensureOrderForWonDeal, nextOrderNo, nextSplitSeq, lineAmount, ORDER_STATUS_LABELS, orderShipments, recalcShippedQty, sumOrderItems, syncOrderFulfillment } from "../order-service.js";
 import { asyncRoute, fileIsAdmin, loadAccessibleFile, orderVisible } from "../server-core.js";
 
 /* ==========================================================================
@@ -66,7 +66,7 @@ function normalizeOrderItems(
     qty: item.qty,
     unit: item.unit,
     unitPrice: item.unitPrice,
-    amount: Math.round(item.qty * item.unitPrice * 100) / 100,
+    amount: lineAmount(item.qty, item.unitPrice),
     shippedQty: 0,
     remark: item.remark
   }));

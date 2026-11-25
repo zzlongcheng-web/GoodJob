@@ -5,6 +5,7 @@ import {
   clearForwardTimestamps,
   deriveOrder,
   ensureOrderForWonDeal,
+  lineAmount,
   nextOrderNo,
   recalcShippedQty,
   sumOrderItems,
@@ -261,4 +262,12 @@ clearForwardTimestamps(cancelledHistory, "cancelled");
 assert.equal(cancelledHistory.confirmedAt, "2026-10-01T00:00:00.000Z");
 assert.equal(cancelledHistory.shippedAt, "2026-10-03T00:00:00.000Z");
 
-console.log("order-service: 13 组断言全部通过");
+// 14) 手工订单与成交自动建单使用同一金额舍入规则，避免 1.005 被算为 1.00。
+assert.equal(lineAmount(1, 1.005), 1.01);
+const fractionalItems = buildOrderItemsFromDeal("ord_fraction", {
+  ...deal,
+  items: [{ id: "fraction", product: "备件", model: "", quantity: 1, unitPrice: 1.005 }]
+}, "");
+assert.equal(fractionalItems[0].amount, 1.01);
+
+console.log("order-service: 14 组断言全部通过");
